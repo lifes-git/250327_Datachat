@@ -225,6 +225,19 @@ if st.session_state.address_df is not None and st.session_state.address_target_c
     df['시도'].apply(mapping_city)
     df['시군구'].apply(mapping_districts)
     df = df.merge(df_hang, on=["시도", "시군구", "읍면동"], how="left")
+    for index, row in df.iterrows():
+    # Check if '행정동' is empty or NaN
+        if pd.isna(row['행정동']) or row['행정동'].strip() == "":
+            # Match '시도', '시군구', and '읍면동' from df to '시도', '시군구', '행정동' from df_hang
+            match = df_hang[
+                (df_hang['시도'] == row['시도']) & 
+                (df_hang['시군구'] == row['시군구']) & 
+                (df_hang['행정동'] == row['읍면동'])
+            ]
+            
+            # If a match is found, update the '행정동' column in df
+            if not match.empty:
+                df.at[index, '행정동'] = match.iloc[0]['행정동']
     df["행정동"] = df["행정동"].fillna("F")
     df = df.merge(df_id, on=["시도", "시군구", "행정동"], how="left")
     df["ID"] = df["ID"].fillna("F")
