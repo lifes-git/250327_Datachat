@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import io
-from functions import map_city_to_two_letters,extract_and_remove_city,extract_and_remove_district,split_address, df_id, df_hang
+from functions import map_city_to_two_letters,extract_and_remove_city,extract_and_remove_district,split_address, df_id, df_hang, mapping_city, mapping_districts
 
 # ✅ Streamlit UI 제목
 st.title("💬 Data Auto system")
@@ -181,10 +181,17 @@ if st.session_state.address_df is not None:
 
 # 5. 정제 할 열이름 입력
 if st.session_state.address_df is not None and st.session_state.address_target_column is None:
-    user_target_column = st.text_input("🔍 주소 정제를 시작할 열을 입력하세요...")
+    user_target_column = st.text_input("🔍 주소 나누기를 시작할 열을 입력하세요... 주소를 나눌필요 없다면 아래 '건너뛰기' 버튼을 눌러주세요")
 
+    # "건너뛰기" 버튼 추가
+    if st.button("🚶‍♂️ 건너뛰기"):
+        st.session_state.address_target_column = "건너뛰기"
+        st.session_state.messages.append({"role": "user", "content": "건너뛰기"})
+        st.session_state.messages.append({"role": "assistant", "content": "⏳ 주소 정제를 건너뛰고 진행합니다."})
+        st.rerun()
+
+    # "건너뛰기" 외에 다른 열을 입력한 경우
     if user_target_column:
-        # ✅ 입력한 열이 데이터프레임에 존재하는지 확인
         if user_target_column not in st.session_state.address_df.columns:
             st.warning(f"⚠️ '{user_target_column}' 열이 데이터에 없습니다. 다시 입력해주세요!")
             st.session_state.messages.append({
@@ -197,8 +204,9 @@ if st.session_state.address_df is not None and st.session_state.address_target_c
             st.session_state.messages.append({"role": "assistant", "content": f"⏳ '{user_target_column}' 열에서 주소를 정제 중 입니다. 잠시만 기다려주세요!"})
             st.rerun()
 
+
 #주소 정제 시작
-if st.session_state.address_df is not None and st.session_state.address_target_column:
+if st.session_state.address_df is not None and st.session_state.address_target_column and st.session_state.address_target_column != "건너뛰기":
     df = st.session_state.address_df.copy()
     df['원본주소'] = df[st.session_state.address_target_column]
     df[st.session_state.address_target_column] = df[st.session_state.address_target_column].apply(map_city_to_two_letters)
@@ -214,11 +222,69 @@ if st.session_state.address_df is not None and st.session_state.address_target_c
     df['시군구'] = df['시군구'].str.replace(r'\s+', '', regex=True)
     df['읍면동'] = df['읍면동'].str.replace(r'[^\w\s]', '', regex=True)
     df['읍면동'] = df['읍면동'].str.replace(r'\s+', '', regex=True)
+    df['시도'].apply(mapping_city)
+    df['시군구'].apply(mapping_districts)
     df = df.merge(df_hang, on=["시도", "시군구", "읍면동"], how="left")
     df["행정동"] = df["행정동"].fillna("F")
     df = df.merge(df_id, on=["시도", "시군구", "행정동"], how="left")
     df["ID"] = df["ID"].fillna("F")
     df = df[['원본주소', '시도', '시군구', '읍면동', '세부주소', '행정동', 'ID']]
+
+    # ✅ 결과 메시지 추가
+    st.session_state.messages.append({"role": "assistant", "content": "✅ 주소정제가 완료되었습니다! 아래에서 결과를 확인하세요."})
+    
+    # ✅ 채팅 형식으로 출력
+    with st.chat_message("assistant"):
+        st.write(df)
+
+    # ✅ CSV 다운로드 버튼 추가
+    csv_file = io.BytesIO()
+    df.to_csv(csv_file, index=False, encoding='utf-8-sig')
+    csv_file.seek(0)
+
+    st.download_button(
+        label="📥 주소 정제 결과 다운로드",
+        data=csv_file,
+        file_name="주소_정제_결과.csv",
+        mime="text/csv"
+    )
+
+    # ✅ 다시 시작 버튼 추가
+    if st.button("🆕 새 채팅", key="new_chat_phone"):
+        reset_session()
+        st.rerun()
+
+#주소 정제 건너뛰기 선택 후 
+if st.session_state.address_df is not None and st.session_state.address_target_column == "건너뛰기":
+    df = st.session_state.address_df.copy()
+    df['시도'] = df['시도'].str.replace(r'[^\w\s]', '', regex=True)
+    df['시도'] = df['시도'].str.replace(r'\s+', '', regex=True)
+    df['시군구'] = df['시군구'].astype(str).str.replace(r'\s+', '', regex=True)
+    df['시군구'] = df['시군구'].str.replace(r'[^\w\s]', '', regex=True)
+    df['시군구'] = df['시군구'].str.replace(r'\s+', '', regex=True)
+    df['읍면동'] = df['읍면동'].str.replace(r'[^\w\s]', '', regex=True)
+    df['읍면동'] = df['읍면동'].str.replace(r'\s+', '', regex=True)
+    df['시도'] = df['시도'].apply(mapping_city)
+    df['시군구'] = df['시군구'].apply(mapping_districts)
+
+    df = df.merge(df_hang, on=["시도", "시군구", "읍면동"], how="left")
+    for index, row in df.iterrows():
+    # Check if '행정동' is empty or NaN
+        if pd.isna(row['행정동']) or row['행정동'].strip() == "":
+            # Match '시도', '시군구', and '읍면동' from df to '시도', '시군구', '행정동' from df_hang
+            match = df_hang[
+                (df_hang['시도'] == row['시도']) & 
+                (df_hang['시군구'] == row['시군구']) & 
+                (df_hang['행정동'] == row['읍면동'])
+            ]
+            
+            # If a match is found, update the '행정동' column in df
+            if not match.empty:
+                df.at[index, '행정동'] = match.iloc[0]['행정동']
+    df["행정동"] = df["행정동"].fillna("F")
+    df = df.merge(df_id, on=["시도", "시군구", "행정동"], how="left")
+    df["ID"] = df["ID"].fillna("F")
+    df = df[['시도', '시군구', '읍면동', '세부주소', '행정동', 'ID']]
 
     # ✅ 결과 메시지 추가
     st.session_state.messages.append({"role": "assistant", "content": "✅ 주소정제가 완료되었습니다! 아래에서 결과를 확인하세요."})
