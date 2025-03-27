@@ -34,7 +34,11 @@ def reset_session():
     st.session_state.phone_string_column = None
     st.session_state.phone_target_column = None
     st.session_state.phone_file_uploaded = False
-    st.session_state.phone_df = None
+    st.session_state.phone_df = None  # 데이터프레임 초기화 추가
+    st.session_state.address_string_column = None
+    st.session_state.address_target_column = None
+    st.session_state.address_file_uploaded = False
+    st.session_state.address_df = None  # 데이터프레임 초기화 추가
     st.session_state.messages = []
 
 # ✅ 사이드바 명령어 안내
@@ -173,7 +177,7 @@ if st.session_state.address_string_column and not st.session_state.address_file_
 if st.session_state.address_df is not None:
     with st.chat_message("assistant"):
         st.write("📊 업로드된 데이터 미리보기:")
-        st.dataframe(st.session_state.address_df.head(5))  # 데이터프레임 상위 5개 행 출력
+        st.dataframe(st.session_state.address_df.head())  # 데이터프레임 상위 5개 행 출력
 
 # 5. 정제 할 열이름 입력
 if st.session_state.address_df is not None and st.session_state.address_target_column is None:
