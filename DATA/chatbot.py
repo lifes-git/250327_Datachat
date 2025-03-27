@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import io
-from functions import map_city_to_two_letters,extract_and_remove_city,extract_and_remove_district,split_address
+from functions import map_city_to_two_letters,extract_and_remove_city,extract_and_remove_district,split_address, df_id, df_hang
 
 # ✅ Streamlit UI 제목
 st.title("💬 데이터 분석 챗봇")
@@ -195,8 +195,6 @@ if st.session_state.address_df is not None and st.session_state.address_target_c
 
 #주소 정제 시작
 if st.session_state.address_df is not None and st.session_state.address_target_column:
-    df_hang = pd.read_excel('행정동매칭.xlsx')
-    df_id = pd.read_excel('마을id.xlsx')
     df = st.session_state.address_df.copy()
     df['원본주소'] = df[st.session_state.address_target_column]
     df[st.session_state.address_target_column] = df[st.session_state.address_target_column].apply(map_city_to_two_letters)
