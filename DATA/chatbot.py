@@ -4,7 +4,7 @@ import io
 from functions import map_city_to_two_letters,extract_and_remove_city,extract_and_remove_district,split_address, df_id, df_hang
 
 # ✅ Streamlit UI 제목
-st.title("💬 민덕이의 챗봇")
+st.title("💬 Data Auto system")
 
 # ✅ 세션 상태 초기화
 if "messages" not in st.session_state:
