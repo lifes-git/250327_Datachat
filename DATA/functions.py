@@ -100705,15 +100705,25 @@ def authenticate_google():
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            # Streamlit Secrets에서 클라이언트 ID와 클라이언트 시크릿 가져오기
-            client_id = st.secrets["google"]["client_id"]
-            client_secret = st.secrets["google"]["client_secret"]
-            
-            flow = InstalledAppFlow.from_client_config(
-                {"installed": {"client_id": client_id, "client_secret": client_secret, "redirect_uris": ["http://localhost"]}},
-                SCOPES
-            )
-            creds = flow.run_local_server(port=0)
+            try:
+                # Streamlit Secrets에서 클라이언트 ID와 클라이언트 시크릿 가져오기
+                client_id = st.secrets["google"]["client_id"]
+                client_secret = st.secrets["google"]["client_secret"]
+                
+                # Google 인증 흐름 생성: 올바른 client_config 형식으로 변환
+                client_config = {
+                    "installed": {
+                        "client_id": client_id,
+                        "client_secret": client_secret,
+                        "redirect_uris": ["http://localhost"]
+                    }
+                }
+                
+                flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
+                creds = flow.run_local_server(port=0)
+            except Exception as e:
+                st.error(f"구글 인증에 실패했습니다: {e}")
+                return None
 
         # 새 토큰 저장
         with open(token_path, "wb") as token:
@@ -100723,5 +100733,3 @@ def authenticate_google():
 
 # Google API 클라이언트와 서비스 초기화
 SCOPES = ["https://www.googleapis.com/auth/drive", "https://spreadsheets.google.com/feeds"]
-
-creds = authenticate_google()
