@@ -1,7 +1,12 @@
 import streamlit as st
 import pandas as pd
 import io
-from functions import map_city_to_two_letters,extract_and_remove_city,extract_and_remove_district,split_address, df_id, df_hang, mapping_city, mapping_districts
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
+import gspread
+import warnings
+from datetime import datetime
+from functions import map_city_to_two_letters,extract_and_remove_city,extract_and_remove_district,split_address, df_id, df_hang, mapping_city, mapping_districts, authenticate_google
 
 # ✅ Streamlit UI 제목
 st.title("💬 Data Auto system")
@@ -27,6 +32,14 @@ if "address_file_uploaded" not in st.session_state:
     st.session_state.address_file_uploaded = False
 if "address_df" not in st.session_state:
     st.session_state.address_df = None
+if "Negative_string_column" not in st.session_state:
+    st.session_state.Negative_string_column = None
+if "Negative_target_column" not in st.session_state:
+    st.session_state.Negative_target_column = None
+if "Negative_file_uploaded" not in st.session_state:
+    st.session_state.Negative_file_uploaded = False
+if "Negative_df" not in st.session_state:
+    st.session_state.Negative_df = None
 
 def reset_session():
     """세션을 초기화하는 함수"""
@@ -39,6 +52,10 @@ def reset_session():
     st.session_state.address_target_column = None
     st.session_state.address_file_uploaded = False
     st.session_state.address_df = None  # 데이터프레임 초기화 추가
+    st.session_state.Negative_string_column = None
+    st.session_state.Negative_target_column = None
+    st.session_state.Negative_file_uploaded = False
+    st.session_state.Negative_df = None  # 데이터프레임 초기화 추가
     st.session_state.messages = []
 
 # ✅ 사이드바 명령어 안내
@@ -55,7 +72,7 @@ for msg in st.session_state.messages:
 
 # ✅ 1. 작업 선택을 UI에서 클릭하여 선택
 if st.session_state.task is None:
-    selected_task = st.selectbox("💬 수행할 작업을 선택하세요:", ["", "중복 확인", "주소 정제"])
+    selected_task = st.selectbox("💬 수행할 작업을 선택하세요:", ["", "중복 확인", "주소 정제","수신거부삭제"])
 
     if selected_task:
         st.session_state.task = selected_task
@@ -65,7 +82,8 @@ if st.session_state.task is None:
             st.session_state.messages.append({"role": "assistant", "content": "🔤 문자열로 읽을 열을 입력해주세요. (예: '이름' 또는 '주소')"})
         elif selected_task == "주소 정제":
             st.session_state.messages.append({"role": "assistant", "content": "📍 주소 정제를 진행할 열을 입력해주세요!"})
-
+        elif selected_task == "수신거부삭제":
+            st.session_state.messages.append({"role": "assistant", "content": "📍 삭제를 진행할 열을 입력해주세요!"})
         st.rerun()  # 선택 즉시 리렌더링
 
 #-------------------------------------------------------중복확인------------------------------------------------------------------------------------------------
@@ -322,3 +340,150 @@ if st.session_state.address_df is not None and st.session_state.address_target_c
     if st.button("🆕 새 채팅", key="new_chat_phone"):
         reset_session()
         st.rerun()
+
+#----------------------------------------------------------080 ,자유마을,아웃콜 삭제요청---------------------------------------------------------------------------------------------# ✅ 문자로 읽을 열이름 선택
+# ✅ 문자로 읽을 열이름 선택
+if st.session_state.task == "수신거부삭제" and st.session_state.Negative_string_column is None:
+    user_column = st.text_input("🔤 문자열로 읽을 열을 입력하세요...")
+    if user_column:
+        st.session_state.Negative_string_column = user_column
+        st.session_state.messages.append({"role": "user", "content": user_column})
+        st.session_state.messages.append({"role": "assistant", "content": f"📂 '{user_column}' 열을 문자열로 변환합니다. 삭제를 진행할 파일을 업로드해주세요!"})
+        st.rerun()
+
+# ✅ 2. Negative_df  파일 업로드
+if st.session_state.Negative_string_column and not st.session_state.Negative_file_uploaded:
+    upload_file = st.file_uploader("📂 CSV 또는 Excel 파일을 업로드하세요!", type=['csv', 'xlsx'])
+    if upload_file is not None:
+        if upload_file.name.endswith('.csv'):
+            df = pd.read_csv(upload_file, dtype={st.session_state.Negative_string_column: str}, low_memory=False)
+        elif upload_file.name.endswith('.xlsx'):
+            df = pd.read_excel(upload_file, dtype={st.session_state.Negative_string_column: str})
+        
+        # ✅ 세션 상태 업데이트
+        st.session_state.Negative_df = df
+        st.session_state.Negative_file_uploaded = True
+        st.session_state.messages.append({"role": "assistant", "content": "✅ 파일이 업로드되었습니다! 삭제를 시작할 열을 입력해주세요."})
+        
+        st.rerun()  # 🔄 리렌더링
+
+# ✅ 4. Negative 업로드된 파일 확인
+if st.session_state.Negative_df is not None:
+    with st.chat_message("assistant"):
+        st.write("📊 업로드된 데이터 미리보기:")
+        st.dataframe(st.session_state.Negative_df.head())  # 데이터프레임 상위 5개 행 출력
+
+if st.session_state.Negative_df is not None and st.session_state.Negative_target_column is None:
+    user_target_column = st.text_input("🔍 제거를 진행할 열을 입력하세요...")
+
+    if user_target_column:
+        # ✅ 입력한 열이 데이터프레임에 존재하는지 확인
+        if user_target_column not in st.session_state.Negative_df.columns:
+            st.warning(f"⚠️ '{user_target_column}' 열이 데이터에 없습니다. 다시 입력해주세요!")
+            st.session_state.messages.append({
+                "role": "assistant", 
+                "content": f"⚠️ '{user_target_column}' 열이 데이터에 없습니다. 가능한 열: {', '.join(st.session_state.Negative_df.columns)}"
+            })
+        else:
+            st.session_state.Negative_target_column = user_target_column
+            st.session_state.messages.append({"role": "user", "content": user_target_column})
+            st.session_state.messages.append({"role": "assistant", "content": f"⏳ '{user_target_column}' 열에서 삭제를 진행 중입니다. 잠시만 기다려주세요!"})
+            st.rerun()
+
+# ✅ 5. 중복 확인 실행 및 결과 출력
+if st.session_state.Negative_df is not None and st.session_state.Negative_target_column:
+    df = st.session_state.Negative_df.copy()
+    creds = authenticate_google()
+    gc = gspread.authorize(creds)
+    drive_service = build("drive", "v3", credentials=creds)
+    sheets_service = build("sheets", "v4", credentials=creds)
+
+    warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
+
+    current_year = datetime.now().year
+
+    # Google Drive에서 최신 엑셀 파일 가져오기
+    folder_id = '1NiTuONWRv7jWsqwmAzY0qEJkdls3__AO'
+    exclude_sheets = ['드랍', '픽업', '자통당TM 구분']
+
+    response = drive_service.files().list(
+        q=f"'{folder_id}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'",
+        spaces='drive',
+        fields='files(id, name, createdTime)',
+        orderBy='createdTime desc'
+    ).execute()
+
+    files = response.get('files', [])
+
+    if not files:
+        print("해당 폴더에 .xlsx 파일이 없습니다.")
+    else:
+        # 가장 최신 파일 다운로드
+        latest_file = files[0]
+        file_id = latest_file['id']
+        file_name = latest_file['name']
+        print(f"가장 최신 파일: {file_name}")
+
+        request = drive_service.files().get_media(fileId=file_id)
+        file_stream = io.BytesIO()
+        downloader = MediaIoBaseDownload(file_stream, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+
+        file_stream.seek(0)
+
+        # 모든 시트 읽기 (특정 시트 제외)
+        excel_file = pd.ExcelFile(file_stream)
+        sheets = [sheet for sheet in excel_file.sheet_names if sheet not in exclude_sheets]
+
+        dtype_mapping = {
+            '연락처': str,
+            '고유값': str,
+            '발신 전화번호': str,
+            '픽업코드': str,
+            '드랍코드': str,
+            '결번': str,
+            '부재중': str,
+            '이미 가입': str,
+            '가입 원함': str,
+            '미온': str,
+            '가입 거절': str,
+            '삭제 요청': str,
+            '타인': str,
+            '투표 긍정': str,
+            '다른 당 지지': str,
+            '긍정': str,
+            '번호변경': str
+        }
+
+        outcall_df = pd.concat(
+            [excel_file.parse(sheet, dtype=dtype_mapping) for sheet in sheets],
+            ignore_index=True
+        )
+
+        df = df[~df[st.session_state.Negative_target_column].isin(outcall_df['연락처'])]
+
+        # ✅ 결과 메시지 추가
+        st.session_state.messages.append({"role": "assistant", "content": "✅ 삭제가 완료되었습니다! 아래에서 결과를 확인하세요."})
+        
+        # ✅ 채팅 형식으로 출력
+        with st.chat_message("assistant"):
+            st.write(df)
+
+        # ✅ CSV 다운로드 버튼 추가
+        csv_file = io.BytesIO()
+        df.to_csv(csv_file, index=False, encoding='utf-8-sig')
+        csv_file.seek(0)
+
+        st.download_button(
+            label="📥 중복 확인 결과 다운로드",
+            data=csv_file,
+            file_name="중복_확인_결과.csv",
+            mime="text/csv"
+        )
+
+        # ✅ 다시 시작 버튼 추가
+        if st.button("🆕 새 채팅", key="new_chat_phone"):
+            reset_session()
+            st.rerun()

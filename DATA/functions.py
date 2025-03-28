@@ -1,6 +1,11 @@
 
 import pandas as pd
 import re
+import os
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+import pickle
+import streamlit as st
 
 def split_address(address):
     if pd.isna(address):
@@ -100685,3 +100690,38 @@ def mapping_districts(address):
     
     return address
 
+# OAuth 2.0 인증 처리
+def authenticate_google():
+    creds = None
+    token_path = "token.pickle"
+
+    # 기존 인증 정보 로드
+    if os.path.exists(token_path):
+        with open(token_path, "rb") as token:
+            creds = pickle.load(token)
+
+    # 토큰이 없거나 만료되었으면 다시 로그인
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            # Streamlit Secrets에서 클라이언트 ID와 클라이언트 시크릿 가져오기
+            client_id = st.secrets["google"]["client_id"]
+            client_secret = st.secrets["google"]["client_secret"]
+            
+            flow = InstalledAppFlow.from_client_config(
+                {"installed": {"client_id": client_id, "client_secret": client_secret, "redirect_uris": ["http://localhost"]}},
+                SCOPES
+            )
+            creds = flow.run_local_server(port=0)
+
+        # 새 토큰 저장
+        with open(token_path, "wb") as token:
+            pickle.dump(creds, token)
+
+    return creds
+
+# Google API 클라이언트와 서비스 초기화
+SCOPES = ["https://www.googleapis.com/auth/drive", "https://spreadsheets.google.com/feeds"]
+
+creds = authenticate_google()
