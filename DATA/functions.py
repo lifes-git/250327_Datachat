@@ -100724,7 +100724,7 @@ def authenticate_google():
                 }
                 
                 flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
-                creds = flow.run_local_server(port=0)
+                creds = flow.run_console()
             except Exception as e:
                 st.error(f"구글 인증에 실패했습니다: {e}")
                 return None
