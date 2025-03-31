@@ -41,6 +41,7 @@ if "Negative_file_uploaded" not in st.session_state:
 if "Negative_df" not in st.session_state:
     st.session_state.Negative_df = None
 
+
 def reset_session():
     """세션을 초기화하는 함수"""
     st.session_state.task = None

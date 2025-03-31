@@ -100695,7 +100695,6 @@ def mapping_districts(address):
     
     return address
 
-# Google API 사용 권한 범위
 SCOPES = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"]
 
 # 인증 처리 함수 (Streamlit Cloud OAuth)
@@ -100704,14 +100703,17 @@ def authenticate_google():
     if "credentials" not in st.session_state:
         st.session_state["credentials"] = None
 
+    creds = None
+    # 이미 인증된 상태라면 세션에서 인증 정보 로드
     if st.session_state["credentials"]:
         creds = Credentials.from_authorized_user_info(st.session_state["credentials"])
     else:
-        # 클라이언트 ID, 클라이언트 시크릿, 리디렉션 URI를 Streamlit Secrets에서 가져옴
+        # 인증되지 않았으면 OAuth 인증 절차 시작
         client_id = st.secrets["google"]["client_id"]
         client_secret = st.secrets["google"]["client_secret"]
         redirect_uri = st.secrets["google"]["redirect_uri"]
         
+        # OAuth Flow 설정
         client_config = {
             "web": {
                 "client_id": client_id,
@@ -100722,15 +100724,23 @@ def authenticate_google():
             }
         }
         
-        flow = Flow.from_client_config(client_config, SCOPES, redirect_uri=redirect_uri)
+        flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
         
-        # OAuth 인증 URL 생성
+        # 인증 URL 생성 및 출력
         auth_url, state = flow.authorization_url(prompt="consent")
         st.session_state["oauth_state"] = state
         st.write(f"[Google로 로그인하기]({auth_url})")
-        
-        return None
 
+        # 사용자가 인증 후 리디렉션 URL을 입력하면
+        authorization_response = st.text_input("Enter the full callback URL here")
+        
+        if authorization_response:
+            flow.fetch_token(authorization_response=authorization_response)
+            creds = flow.credentials
+            # 인증된 credentials을 세션에 저장
+            st.session_state["credentials"] = creds.to_json()
+            st.experimental_rerun()  # 인증 후 페이지를 새로고침하여 인증 완료 상태로 전환
+    
     return creds
 
 # Google 인증을 통해 필요한 서비스 생성
