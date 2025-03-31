@@ -390,7 +390,7 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
             st.session_state.messages.append({"role": "assistant", "content": f"⏳ '{user_target_column}' 열에서 삭제를 진행 중입니다. 잠시만 기다려주세요!"})
             st.rerun()
 
-# ✅ 5. 중복 확인 실행 및 결과 출력
+# ✅ 5. 중복 제거 실행 및 결과 출력
 if st.session_state.Negative_df is not None and st.session_state.Negative_target_column:
     df = st.session_state.Negative_df.copy()
     creds = authenticate_google()
