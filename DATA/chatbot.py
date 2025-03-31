@@ -6,7 +6,7 @@ from googleapiclient.http import MediaIoBaseDownload
 import gspread
 import warnings
 from datetime import datetime
-from functions import map_city_to_two_letters,extract_and_remove_city,extract_and_remove_district,split_address, df_id, df_hang, mapping_city, mapping_districts, authenticate_google
+from functions import map_city_to_two_letters,extract_and_remove_city,extract_and_remove_district,split_address, df_id, df_hang, mapping_city, mapping_districts, get_google_services,authenticate_google
 
 # ✅ Streamlit UI 제목
 st.title("💬 Data Auto system")
@@ -393,10 +393,16 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
 # ✅ 5. 중복 제거 실행 및 결과 출력
 if st.session_state.Negative_df is not None and st.session_state.Negative_target_column:
     df = st.session_state.Negative_df.copy()
+    
+    # Google 인증
     creds = authenticate_google()
-    gc = gspread.authorize(creds)
-    drive_service = build("drive", "v3", credentials=creds)
-    sheets_service = build("sheets", "v4", credentials=creds)
+
+    if creds is None:
+        # 인증이 안 되었을 경우
+        st.error("Google 인증이 필요합니다. 인증 후 다시 시도해주세요.")
+        st.stop()
+
+    gc, drive_service, sheets_service = get_google_services(creds)
 
     warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
 
@@ -416,13 +422,13 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
     files = response.get('files', [])
 
     if not files:
-        print("해당 폴더에 .xlsx 파일이 없습니다.")
+        st.error("해당 폴더에 .xlsx 파일이 없습니다.")
     else:
         # 가장 최신 파일 다운로드
         latest_file = files[0]
         file_id = latest_file['id']
         file_name = latest_file['name']
-        print(f"가장 최신 파일: {file_name}")
+        st.write(f"가장 최신 파일: {file_name}")
 
         request = drive_service.files().get_media(fileId=file_id)
         file_stream = io.BytesIO()

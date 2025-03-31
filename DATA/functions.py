@@ -4,6 +4,11 @@ import re
 import os
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+import google.auth
+from google_auth_oauthlib.flow import Flow
+import gspread
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
 import pickle
 import streamlit as st
 
@@ -100690,50 +100695,48 @@ def mapping_districts(address):
     
     return address
 
-# OAuth 2.0 인증 처리
+# Google API 사용 권한 범위
+SCOPES = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"]
+
+# 인증 처리 함수 (Streamlit Cloud OAuth)
 def authenticate_google():
-    creds = None
-    token_path = "token.pickle"
+    """Streamlit Cloud에서 OAuth 인증을 통해 Google API에 접근"""
+    if "credentials" not in st.session_state:
+        st.session_state["credentials"] = None
 
-    # 기존 인증 정보 로드
-    if os.path.exists(token_path):
-        with open(token_path, "rb") as token:
-            creds = pickle.load(token)
-
-    # 토큰이 없거나 만료되었으면 다시 로그인
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            try:
-                # Streamlit Secrets에서 클라이언트 ID와 클라이언트 시크릿 가져오기
-                client_id = st.secrets["google"]["client_id"]
-                client_secret = st.secrets["google"]["client_secret"]
-                
-                # Google 인증 흐름 생성: 올바른 client_config 형식으로 변환
-                client_config = {
-                    "installed": {
-                        "client_id": client_id,
-                        "project_id":"root-unison-445102-g4",
-                        "auth_uri":"https://accounts.google.com/o/oauth2/auth",
-                        "token_uri":"https://oauth2.googleapis.com/token",
-                        "auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs",
-                        "client_secret": client_secret,
-                        "redirect_uris": ["http://localhost"]
-                    }
-                }
-                
-                flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
-                creds = flow.run_console()
-            except Exception as e:
-                st.error(f"구글 인증에 실패했습니다: {e}")
-                return None
-
-        # 새 토큰 저장
-        with open(token_path, "wb") as token:
-            pickle.dump(creds, token)
+    if st.session_state["credentials"]:
+        creds = Credentials.from_authorized_user_info(st.session_state["credentials"])
+    else:
+        # 클라이언트 ID, 클라이언트 시크릿, 리디렉션 URI를 Streamlit Secrets에서 가져옴
+        client_id = st.secrets["google"]["client_id"]
+        client_secret = st.secrets["google"]["client_secret"]
+        redirect_uri = st.secrets["google"]["redirect_uri"]
+        
+        client_config = {
+            "web": {
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "redirect_uris": [redirect_uri],
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token"
+            }
+        }
+        
+        flow = Flow.from_client_config(client_config, SCOPES, redirect_uri=redirect_uri)
+        
+        # OAuth 인증 URL 생성
+        auth_url, state = flow.authorization_url(prompt="consent")
+        st.session_state["oauth_state"] = state
+        st.write(f"[Google로 로그인하기]({auth_url})")
+        
+        return None
 
     return creds
 
-# Google API 클라이언트와 서비스 초기화
-SCOPES = ["https://www.googleapis.com/auth/drive", "https://spreadsheets.google.com/feeds"]
+# Google 인증을 통해 필요한 서비스 생성
+def get_google_services(creds):
+    """Google Drive 및 Sheets 서비스 생성"""
+    gc = gspread.authorize(creds)
+    drive_service = build("drive", "v3", credentials=creds)
+    sheets_service = build("sheets", "v4", credentials=creds)
+    return gc, drive_service, sheets_service
