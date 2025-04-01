@@ -100718,7 +100718,7 @@ def authenticate_google():
             "web": {
                 "client_id": client_id,
                 "client_secret": client_secret,
-                "redirect_uris": ["https://250327datachat-l88rlsemzbhauz4wveabv6.streamlit.app/"],
+                "redirect_uris": ["https://250327datachat-l88rlsemzbhauz4wveabv6.streamlit.app/callback"],
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://oauth2.googleapis.com/token"
             }
