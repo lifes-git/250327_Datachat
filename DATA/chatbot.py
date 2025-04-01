@@ -72,7 +72,7 @@ if creds is None:
     # 인증이 완료되지 않으면 인증을 먼저 시도
     if authenticate_google():
         st.session_state.messages.append({"role": "assistant", "content": "✅ Google 인증이 완료되었습니다."})
-        st.experimental_rerun()  # 인증이 완료되면 페이지를 리렌더링
+        st.rerun()  # 인증이 완료되면 페이지를 리렌더링
 else:
     # 인증 완료 후, 작업 선택 UI
     for msg in st.session_state.messages:
