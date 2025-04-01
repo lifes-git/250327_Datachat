@@ -60,6 +60,7 @@ def reset_session():
     st.session_state.Negative_file_uploaded = False
     st.session_state.Negative_df = None  # 데이터프레임 초기화 추가
     st.session_state.messages = []
+    st.session_state.creds = None
 
 # ✅ 사이드바 명령어 안내
 st.sidebar.title("📜 사용 가능 명령어")
@@ -69,7 +70,7 @@ if st.sidebar.button("🆕 새 채팅", key="new_chat_sidebar"):
 
 
 # ✅ 인증 완료 후 작업 선택
-if creds is None:
+if st.session_state.creds is None:
     # 인증이 완료되지 않으면 인증을 먼저 시도
     if authenticate_google():
         st.session_state.messages.append({"role": "assistant", "content": "✅ Google 인증이 완료되었습니다."})
