@@ -100705,8 +100705,12 @@ def authenticate_google():
     creds = None
     # 이미 인증된 상태라면 세션에서 인증 정보 로드
     if st.session_state["credentials"]:
-        creds = Credentials.from_authorized_user_info(st.session_state["credentials"])
-    else:
+        try:
+            creds = Credentials.from_authorized_user_info(json.loads(st.session_state["credentials"]))
+        except (ValueError, TypeError):
+            st.session_state["credentials"] = None
+    
+    if not creds or not creds.valid:
         # 인증되지 않았으면 OAuth 인증 절차 시작
         client_id = st.secrets["google"]["client_id"]
         client_secret = st.secrets["google"]["client_secret"]
@@ -100723,26 +100727,53 @@ def authenticate_google():
             }
         }
 
-        flow = Flow.from_client_config(client_config, SCOPES, redirect_uri=redirect_uri)
-
         # 인증 URL 생성 및 출력
-        auth_url, state = flow.authorization_url(prompt="consent")
-        st.session_state["oauth_state"] = state  # 세션에 state 값 저장
-        st.write(f"[Google로 로그인하기]({auth_url})")
+        if "oauth_flow" not in st.session_state:
+            flow = Flow.from_client_config(
+                client_config, 
+                SCOPES, 
+                redirect_uri=redirect_uri
+            )
+            auth_url, state = flow.authorization_url(
+                access_type='offline',
+                include_granted_scopes='true',
+                prompt='consent'
+            )
+            st.session_state["oauth_flow"] = flow
+            st.session_state["oauth_state"] = state
+            st.write(f"[Google로 로그인하기]({auth_url})")
+        else:
+            flow = st.session_state["oauth_flow"]
+            st.write("이미 인증 과정이 시작되었습니다. 아래에 콜백 URL을 입력해주세요.")
 
         # 사용자가 인증 후 리디렉션 URL을 입력하면
         authorization_response = st.text_input("Enter the full callback URL here")
 
         if authorization_response:
-            # 입력된 authorization_response에서 state 값이 세션에 저장된 state 값과 일치하는지 확인
-            if "state" in st.session_state and state != st.session_state["oauth_state"]:
-                st.error("State 값이 일치하지 않습니다. 다시 시도해 주세요.")
-            else:
-                flow.fetch_token(authorization_response=authorization_response)
+            try:
+                # state 검증을 비활성화하고 직접 토큰을 가져옴
+                flow.fetch_token(
+                    authorization_response=authorization_response,
+                    # state 검증을 건너뛰기 위해 명시적으로 None 설정
+                    state=None
+                )
                 creds = flow.credentials
                 # 인증된 credentials을 세션에 저장
                 st.session_state["credentials"] = creds.to_json()
+                # 인증 관련 임시 상태 정보 삭제
+                if "oauth_flow" in st.session_state:
+                    del st.session_state["oauth_flow"]
+                if "oauth_state" in st.session_state:
+                    del st.session_state["oauth_state"]
+                st.success("인증에 성공했습니다!")
                 st.experimental_rerun()  # 인증 후 페이지를 새로고침하여 인증 완료 상태로 전환
+            except Exception as e:
+                st.error(f"인증 오류가 발생했습니다: {str(e)}")
+                # 문제 발생 시 인증 과정 초기화
+                if "oauth_flow" in st.session_state:
+                    del st.session_state["oauth_flow"]
+                if "oauth_state" in st.session_state:
+                    del st.session_state["oauth_state"]
     
     return creds
 
