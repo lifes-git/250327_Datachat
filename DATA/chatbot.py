@@ -421,99 +421,100 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
             call_refusal_080  = pd.concat(df_list, ignore_index=True)
             call_refusal_080 ['전화번호'] = call_refusal_080 ['전화번호'].str.replace(r'\D', '', regex=True)
             st.write("최종 데이터프레임:", call_refusal_080 .head())
+        elif creds is not None:
+            gc, drive_service, sheets_service = get_google_services(creds)
+
+            warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
+
+            current_year = datetime.now().year
+
+            # Google Drive에서 최신 엑셀 파일 가져오기
+            folder_id = '1NiTuONWRv7jWsqwmAzY0qEJkdls3__AO'
+            exclude_sheets = ['드랍', '픽업', '자통당TM 구분']
+
+            response = drive_service.files().list(
+                q=f"'{folder_id}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'",
+                spaces='drive',
+                fields='files(id, name, createdTime)',
+                orderBy='createdTime desc'
+            ).execute()
+
+            files = response.get('files', [])
+
+            if not files:
+                st.error("해당 폴더에 .xlsx 파일이 없습니다.")
+            else:
+                # 가장 최신 파일 다운로드
+                latest_file = files[0]
+                file_id = latest_file['id']
+                file_name = latest_file['name']
+                st.write(f"가장 최신 파일: {file_name}")
+
+                request = drive_service.files().get_media(fileId=file_id)
+                file_stream = io.BytesIO()
+                downloader = MediaIoBaseDownload(file_stream, request)
+                done = False
+                while not done:
+                    _, done = downloader.next_chunk()
+
+                file_stream.seek(0)
+
+                # 모든 시트 읽기 (특정 시트 제외)
+                excel_file = pd.ExcelFile(file_stream)
+                sheets = [sheet for sheet in excel_file.sheet_names if sheet not in exclude_sheets]
+
+                # 로딩바 표시: 진행 상황을 0부터 100까지 업데이트
+                progress_bar = st.progress(0)  # 로딩바 초기화
+
+                dtype_mapping = {
+                    '연락처': str,
+                    '고유값': str,
+                    '발신 전화번호': str,
+                    '픽업코드': str,
+                    '드랍코드': str,
+                    '결번': str,
+                    '부재중': str,
+                    '이미 가입': str,
+                    '가입 원함': str,
+                    '미온': str,
+                    '가입 거절': str,
+                    '삭제 요청': str,
+                    '타인': str,
+                    '투표 긍정': str,
+                    '다른 당 지지': str,
+                    '긍정': str,
+                    '번호변경': str
+                }
+
+                # 각 시트를 읽을 때마다 진행 상태 업데이트
+                outcall_df = pd.DataFrame()  # 빈 데이터프레임으로 시작
+                total_sheets = len(sheets)
+                for idx, sheet in enumerate(sheets):
+                    sheet_df = excel_file.parse(sheet, dtype=dtype_mapping)
+                    outcall_df = pd.concat([outcall_df, sheet_df], ignore_index=True)
+                    # 진행 상태 업데이트 (시트마다 진행도 100/전체시트수로 나누기)
+                    progress_bar.progress(int(((idx + 1) / total_sheets) * 100))
+
+                # 진행 상황이 끝났을 때 (100%)
+                progress_bar.progress(100)
+
+                outcall_df = outcall_df[outcall_df['삭제 요청'] == 1]
+#----------------------------------------------------------------------------------------------------------------
+                # 가져올 Google 스프레드시트 파일 ID
+                SPREADSHEET_ID = "1O5IaTXvBQnVTSJhrhPlMI45LxHcL2BkHCHO6IhNA7Bs"
+
+                # 1. 스프레드시트 열기
+                sh = gc.open_by_key(SPREADSHEET_ID)
+
+                # 2. 특정 시트 데이터 가져오기 (예: 첫 번째 시트)
+                worksheet = sh.get_worksheet(0)  # 0은 첫 번째 시트
+
+                # 3. 모든 데이터 가져와 pandas DataFrame으로 변환
+                data = worksheet.get_all_values()  # 리스트 형태로 가져오기
+                Unsubscribed_df = pd.DataFrame(data[1:], columns=data[0])  # 첫 번째 행을 헤더로 사용
+
         else:
             st.warning("파일을 제대로 업로드하거나 읽지 못했습니다.")
-#----------------------------------------------------------------------------------------------------------------
-    gc, drive_service, sheets_service = get_google_services(creds)
-
-    warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
-
-    current_year = datetime.now().year
-
-    # Google Drive에서 최신 엑셀 파일 가져오기
-    folder_id = '1NiTuONWRv7jWsqwmAzY0qEJkdls3__AO'
-    exclude_sheets = ['드랍', '픽업', '자통당TM 구분']
-
-    response = drive_service.files().list(
-        q=f"'{folder_id}' in parents and mimeType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'",
-        spaces='drive',
-        fields='files(id, name, createdTime)',
-        orderBy='createdTime desc'
-    ).execute()
-
-    files = response.get('files', [])
-
-    if not files:
-        st.error("해당 폴더에 .xlsx 파일이 없습니다.")
-    else:
-        # 가장 최신 파일 다운로드
-        latest_file = files[0]
-        file_id = latest_file['id']
-        file_name = latest_file['name']
-        st.write(f"가장 최신 파일: {file_name}")
-
-        request = drive_service.files().get_media(fileId=file_id)
-        file_stream = io.BytesIO()
-        downloader = MediaIoBaseDownload(file_stream, request)
-        done = False
-        while not done:
-            _, done = downloader.next_chunk()
-
-        file_stream.seek(0)
-
-        # 모든 시트 읽기 (특정 시트 제외)
-        excel_file = pd.ExcelFile(file_stream)
-        sheets = [sheet for sheet in excel_file.sheet_names if sheet not in exclude_sheets]
-
-        # 로딩바 표시: 진행 상황을 0부터 100까지 업데이트
-        progress_bar = st.progress(0)  # 로딩바 초기화
-
-        dtype_mapping = {
-            '연락처': str,
-            '고유값': str,
-            '발신 전화번호': str,
-            '픽업코드': str,
-            '드랍코드': str,
-            '결번': str,
-            '부재중': str,
-            '이미 가입': str,
-            '가입 원함': str,
-            '미온': str,
-            '가입 거절': str,
-            '삭제 요청': str,
-            '타인': str,
-            '투표 긍정': str,
-            '다른 당 지지': str,
-            '긍정': str,
-            '번호변경': str
-        }
-
-        # 각 시트를 읽을 때마다 진행 상태 업데이트
-        outcall_df = pd.DataFrame()  # 빈 데이터프레임으로 시작
-        total_sheets = len(sheets)
-        for idx, sheet in enumerate(sheets):
-            sheet_df = excel_file.parse(sheet, dtype=dtype_mapping)
-            outcall_df = pd.concat([outcall_df, sheet_df], ignore_index=True)
-            # 진행 상태 업데이트 (시트마다 진행도 100/전체시트수로 나누기)
-            progress_bar.progress(int(((idx + 1) / total_sheets) * 100))
-
-        # 진행 상황이 끝났을 때 (100%)
-        progress_bar.progress(100)
-
-        outcall_df = outcall_df[outcall_df['삭제 요청'] == 1]
-#----------------------------------------------------------------------------------------------------------------
-        # 가져올 Google 스프레드시트 파일 ID
-        SPREADSHEET_ID = "1O5IaTXvBQnVTSJhrhPlMI45LxHcL2BkHCHO6IhNA7Bs"
-
-        # 1. 스프레드시트 열기
-        sh = gc.open_by_key(SPREADSHEET_ID)
-
-        # 2. 특정 시트 데이터 가져오기 (예: 첫 번째 시트)
-        worksheet = sh.get_worksheet(0)  # 0은 첫 번째 시트
-
-        # 3. 모든 데이터 가져와 pandas DataFrame으로 변환
-        data = worksheet.get_all_values()  # 리스트 형태로 가져오기
-        Unsubscribed_df = pd.DataFrame(data[1:], columns=data[0])  # 첫 번째 행을 헤더로 사용
 #----------------------------------------------------------------------------------------------------------------
 
         # 이후 데이터 처리
