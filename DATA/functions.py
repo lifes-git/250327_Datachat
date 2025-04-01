@@ -100698,111 +100698,41 @@ def mapping_districts(address):
 SCOPES = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"]
 
 def authenticate_google():
-    """버튼을 사용하여 OAuth 인증 개선"""
-    if "credentials" not in st.session_state:
-        st.session_state["credentials"] = None
+    """서비스 계정을 사용한 Google API 인증 (민감 정보는 입력받도록 개선)"""
+    
+    if "creds" not in st.session_state:
+        # 사용자 입력을 받음 (보안 강화를 위해)
+        st.subheader("🔑 Google 서비스 계정 인증")
+        client_email = st.text_input("📧 서비스 계정 이메일", type="default")
+        private_key = st.text_area("🔑 비공개 키 (PRIVATE KEY)", type="password")
 
-    creds = None
-    # 이미 인증된 상태라면 세션에서 인증 정보 로드
-    if st.session_state["credentials"]:
-        try:
-            creds = Credentials.from_authorized_user_info(json.loads(st.session_state["credentials"]))
-            if creds and creds.valid:
+        # 사용자가 입력한 값이 있는지 확인
+        if client_email and private_key:
+            try:
+                service_account_info = {
+                    "type": "service_account",
+                    "project_id": "your_project_id",  # 공개 가능
+                    "private_key_id": "your_private_key_id",  # 민감도가 낮아도 노출 주의
+                    "private_key": private_key.replace("\\n", "\n"),  # 입력된 키를 정상 포맷으로 변환
+                    "client_email": client_email,
+                    "client_id": "your_client_id",
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                    "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{client_email}"
+                }
+                
+                # 서비스 계정 인증 처리
+                creds = Credentials.from_service_account_info(service_account_info)
+                st.session_state.creds = creds  # 인증 정보를 세션 상태에 저장
+                st.success("✅ Google 인증이 완료되었습니다!")
                 return creds
-        except (ValueError, TypeError):
-            st.session_state["credentials"] = None
-    
-    # OAuth 설정
-    client_id = st.secrets["google"]["client_id"]
-    client_secret = st.secrets["google"]["client_secret"]
-    redirect_uri = st.secrets["google"]["redirect_uri"]
-    
-    client_config = {
-        "web": {
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "redirect_uris": [redirect_uri],
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token"
-        }
-    }
-    
-    # 인증 URL 생성
-    if "oauth_flow" not in st.session_state:
-        flow = Flow.from_client_config(
-            client_config, 
-            SCOPES, 
-            redirect_uri=redirect_uri
-        )
-        auth_url, state = flow.authorization_url(
-            access_type='offline',
-            include_granted_scopes='true',
-            prompt='consent'
-        )
-        st.session_state["oauth_flow"] = flow
-        st.session_state["oauth_state"] = state
-        
-        # 버튼 클릭 시 새 탭에서 인증 페이지 열기
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.markdown(
-                f"""
-                <a href="{auth_url}" target="_blank">
-                    <button style="
-                        background-color: #4285F4;
-                        color: white;
-                        border: none;
-                        border-radius: 4px;
-                        padding: 10px 20px;
-                        font-size: 16px;
-                        cursor: pointer;
-                        display: flex;
-                        align-items: center;
-                        width: 100%;
-                    ">
-                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
-                             style="margin-right: 10px; width: 18px; height: 18px;">
-                        Google 계정으로 로그인
-                    </button>
-                </a>
-                """, 
-                unsafe_allow_html=True
-            )
-        with col2:
-            if st.button("인증 취소", type="secondary"):
-                if "oauth_flow" in st.session_state:
-                    del st.session_state["oauth_flow"]
-                if "oauth_state" in st.session_state:
-                    del st.session_state["oauth_state"]
-                st.rerun()
-    else:
-        st.info("인증 과정이 시작되었습니다. 구글 로그인 완료 후 받은 URL을 아래에 붙여넣으세요.")
-        flow = st.session_state["oauth_flow"]
 
-    # 콜백 URL 입력 처리
-    st.markdown("---")
-    authorization_response = st.text_input(
-        "인증 후 받은 URL을 여기에 붙여넣으세요", 
-        help="구글 로그인 후 리디렉션된 페이지의 전체 URL을 복사하여 붙여넣으세요"
-    )
-    
-    if authorization_response:
-        try:
-            flow.fetch_token(authorization_response=authorization_response, state=None)
-            creds = flow.credentials
-            st.session_state["credentials"] = creds.to_json()
-            if "oauth_flow" in st.session_state:
-                del st.session_state["oauth_flow"]
-            if "oauth_state" in st.session_state:
-                del st.session_state["oauth_state"]
-            st.success("인증에 성공했습니다!")
-            st.rerun()
-        except Exception as e:
-            st.error(f"인증 오류가 발생했습니다: {str(e)}")
-            # 세부 오류 정보 표시
-            st.expander("상세 오류 정보").write(str(e))
-    
-    return creds
+            except Exception as e:
+                st.error(f"❌ 인증 오류 발생: {str(e)}")
+                return None
+
+    return st.session_state.get("creds", None)
 
 def get_google_services(creds):
     """Google Drive 및 Sheets 서비스 생성"""
