@@ -72,15 +72,15 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-# ✅ 인증 완료 후 작업 선택
 if st.session_state.creds is None:
     # 인증이 완료되지 않으면 인증을 먼저 시도
     if authenticate_google():
-        st.session_state.messages.append({"role": "assistant", "content": "✅ Google 인증이 완료되었습니다."})
-        st.session_state.task = None
+        if "✅ Google 인증이 완료되었습니다." not in [msg["content"] for msg in st.session_state.messages]:
+            st.session_state.messages.append({"role": "assistant", "content": "✅ Google 인증이 완료되었습니다."})
+        st.session_state.task = None  # Reset task selection after authentication
         st.rerun()  # 인증이 완료되면 페이지를 리렌더링
 else:
-    # 작업 선택
+    # 인증 완료 후, 작업 선택 UI
     if st.session_state.task is None:
         selected_task = st.selectbox("💬 수행할 작업을 선택하세요:", ["", "중복 확인", "주소 정제", "수신거부삭제"])
 
@@ -94,8 +94,6 @@ else:
                 st.session_state.messages.append({"role": "assistant", "content": "📍 주소 정제를 진행할 열을 입력해주세요!"})
             elif selected_task == "수신거부삭제":
                 st.session_state.messages.append({"role": "assistant", "content": "📍 삭제를 진행할 열을 입력해주세요!"})
-            st.rerun()  # 선택 즉시 리렌더링
-
 #-------------------------------------------------------중복확인------------------------------------------------------------------------------------------------
 # ✅ 2. phone 문자열로 읽을 열 선택
 if st.session_state.task == "중복 확인" and st.session_state.phone_string_column is None:
