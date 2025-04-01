@@ -74,7 +74,7 @@ for msg in st.session_state.messages:
 
 # ✅ 1. 작업 선택을 UI에서 클릭하여 선택
 if st.session_state.task is None:
-    selected_task = st.selectbox("💬 수행할 작업을 선택하세요:", ["", "중복 확인", "주소 정제","수신거부삭제"])
+    selected_task = st.selectbox("💬 수행할 작업을 선택하세요:", ["", "중복 확인", "주소 정제","강성데이터삭제"])
 
     if selected_task:
         st.session_state.task = selected_task
@@ -84,7 +84,7 @@ if st.session_state.task is None:
             st.session_state.messages.append({"role": "assistant", "content": "🔤 문자열로 읽을 열을 입력해주세요. (예: '이름' 또는 '주소')"})
         elif selected_task == "주소 정제":
             st.session_state.messages.append({"role": "assistant", "content": "📍 주소 정제를 진행할 열을 입력해주세요!"})
-        elif selected_task == "수신거부삭제":
+        elif selected_task == "강성데이터삭제":
             st.session_state.messages.append({"role": "assistant", "content": "📍 삭제를 진행할 열을 입력해주세요!"})
         st.rerun()  # 선택 즉시 리렌더링
 
@@ -345,7 +345,7 @@ if st.session_state.address_df is not None and st.session_state.address_target_c
 
 #----------------------------------------------------------080 ,자유마을,아웃콜 삭제요청---------------------------------------------------------------------------------------------# ✅ 문자로 읽을 열이름 선택
 # ✅ 문자로 읽을 열이름 선택
-if st.session_state.task == "수신거부삭제" and st.session_state.Negative_string_column is None:
+if st.session_state.task == "강성데이터삭제" and st.session_state.Negative_string_column is None:
     user_column = st.text_input("🔤 문자열로 읽을 열을 입력하세요...")
     if user_column:
         st.session_state.Negative_string_column = user_column
@@ -394,7 +394,29 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
 
 if st.session_state.Negative_df is not None and st.session_state.Negative_target_column:
     df = st.session_state.Negative_df.copy()
+#----------------------------------------------------------------------------------------------------------------
+    uploaded_files = st.file_uploader("엑셀 파일을 업로드하세요", type=["xls"], accept_multiple_files=True)
 
+if uploaded_files:
+    df_list = []  # 데이터프레임을 저장할 리스트
+    
+    # 파일 하나씩 읽어서 처리
+    for uploaded_file in uploaded_files:
+        try:
+            # 업로드된 파일 읽기
+            df = pd.read_csv(uploaded_file, sep="\t", encoding="cp949", skiprows=1, on_bad_lines='skip')
+            df_list.append(df)
+        except Exception as e:
+            st.error(f"파일 '{uploaded_file.name}' 처리 실패 - 오류: {e}")
+
+    # 데이터프레임 하나로 합치기
+    if df_list:
+        call_refusal_080  = pd.concat(df_list, ignore_index=True)
+        call_refusal_080 ['전화번호'] = call_refusal_080 ['전화번호'].str.replace(r'\D', '', regex=True)
+        st.write("최종 데이터프레임:", call_refusal_080 .head())
+    else:
+        st.warning("파일을 제대로 업로드하거나 읽지 못했습니다.")
+#----------------------------------------------------------------------------------------------------------------
     # Google 인증
     creds = authenticate_google()
 
@@ -475,14 +497,30 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
             outcall_df = pd.concat([outcall_df, sheet_df], ignore_index=True)
             # 진행 상태 업데이트 (시트마다 진행도 100/전체시트수로 나누기)
             progress_bar.progress(int(((idx + 1) / total_sheets) * 100))
-            time.sleep(0.5)  # 실제 데이터 로딩 시간에 맞추어 지연을 추가할 수 있습니다
 
         # 진행 상황이 끝났을 때 (100%)
         progress_bar.progress(100)
-        time.sleep(0.5)  # 완료 후 잠시 멈춤
+
+        outcall_df = outcall_df[outcall_df['삭제 요청'] == 1]
+#----------------------------------------------------------------------------------------------------------------
+        # 가져올 Google 스프레드시트 파일 ID
+        SPREADSHEET_ID = "1O5IaTXvBQnVTSJhrhPlMI45LxHcL2BkHCHO6IhNA7Bs"
+
+        # 1. 스프레드시트 열기
+        sh = gc.open_by_key(SPREADSHEET_ID)
+
+        # 2. 특정 시트 데이터 가져오기 (예: 첫 번째 시트)
+        worksheet = sh.get_worksheet(0)  # 0은 첫 번째 시트
+
+        # 3. 모든 데이터 가져와 pandas DataFrame으로 변환
+        data = worksheet.get_all_values()  # 리스트 형태로 가져오기
+        Unsubscribed_df = pd.DataFrame(data[1:], columns=data[0])  # 첫 번째 행을 헤더로 사용
+#----------------------------------------------------------------------------------------------------------------
 
         # 이후 데이터 처리
         df = df[~df[st.session_state.Negative_target_column].isin(outcall_df['연락처'])]
+        df = df[~df[st.session_state.Negative_target_column].isin(call_refusal_080['전화번호'])]
+        df = df[~df[st.session_state.Negative_target_column].isin(Unsubscribed_df['phone'])]
 
         # ✅ 결과 메시지 추가
         st.session_state.messages.append({"role": "assistant", "content": "✅ 삭제가 완료되었습니다! 아래에서 결과를 확인하세요."})
