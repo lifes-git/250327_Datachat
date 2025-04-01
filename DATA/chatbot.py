@@ -68,19 +68,18 @@ if st.sidebar.button("🆕 새 채팅", key="new_chat_sidebar"):
     reset_session()
     st.rerun()
 
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.write(msg["content"])
 
 # ✅ 인증 완료 후 작업 선택
 if st.session_state.creds is None:
     # 인증이 완료되지 않으면 인증을 먼저 시도
     if authenticate_google():
         st.session_state.messages.append({"role": "assistant", "content": "✅ Google 인증이 완료되었습니다."})
+        st.session_state.task = None
         st.rerun()  # 인증이 완료되면 페이지를 리렌더링
 else:
-    # 인증 완료 후, 작업 선택 UI
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.write(msg["content"])
-
     # 작업 선택
     if st.session_state.task is None:
         selected_task = st.selectbox("💬 수행할 작업을 선택하세요:", ["", "중복 확인", "주소 정제", "수신거부삭제"])
