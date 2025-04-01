@@ -100699,52 +100699,52 @@ SCOPES = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/a
 
 def authenticate_google():
     """Streamlit Cloud에서 OAuth 인증을 통해 Google API에 접근"""
-
     if "credentials" not in st.session_state:
         st.session_state["credentials"] = None
 
     creds = None
+    # 이미 인증된 상태라면 세션에서 인증 정보 로드
     if st.session_state["credentials"]:
         creds = Credentials.from_authorized_user_info(st.session_state["credentials"])
     else:
-        # ✅ 환경변수에서 OAuth 정보 불러오기
+        # 인증되지 않았으면 OAuth 인증 절차 시작
         client_id = st.secrets["google"]["client_id"]
         client_secret = st.secrets["google"]["client_secret"]
         redirect_uri = st.secrets["google"]["redirect_uri"]
-
-        # ✅ 웹 애플리케이션용 OAuth 설정
+        
+        # OAuth Flow 설정
         client_config = {
             "web": {
                 "client_id": client_id,
                 "client_secret": client_secret,
-                "redirect_uris": [redirect_uri],
+                "redirect_uris": ["https://250327datachat-l88rlsemzbhauz4wveabv6.streamlit.app/callback"],
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://oauth2.googleapis.com/token"
             }
         }
 
-        # ✅ OAuth Flow 설정 (웹 인증 방식)
-        flow = Flow.from_client_config(client_config, SCOPES, redirect_uri=redirect_uri)
+        flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
 
-        auth_url, state = flow.authorization_url(prompt="consent", access_type="offline")
-        st.session_state["oauth_state"] = state
-
-        # ✅ 로그인 링크 제공
+        # 인증 URL 생성 및 출력
+        auth_url, state = flow.authorization_url(prompt="consent")
+        st.session_state["oauth_state"] = state  # 세션에 state 값 저장
         st.write(f"[Google로 로그인하기]({auth_url})")
 
-        # ✅ 사용자가 인증 후 전달된 URL 입력
-        authorization_response = st.text_input("인증 완료 후 받은 URL을 입력하세요")
+        # 사용자가 인증 후 리디렉션 URL을 입력하면
+        authorization_response = st.text_input("Enter the full callback URL here")
 
         if authorization_response:
-            flow.fetch_token(authorization_response=authorization_response)
-            creds = flow.credentials
-
-            # ✅ 세션 상태에 저장 후 새로고침
-            st.session_state["credentials"] = creds.to_json()
-            st.experimental_rerun()
-
+            # 입력된 authorization_response에서 state 값이 세션에 저장된 state 값과 일치하는지 확인
+            if "state" in st.session_state and state != st.session_state["oauth_state"]:
+                st.error("State 값이 일치하지 않습니다. 다시 시도해 주세요.")
+            else:
+                flow.fetch_token(authorization_response=authorization_response)
+                creds = flow.credentials
+                # 인증된 credentials을 세션에 저장
+                st.session_state["credentials"] = creds.to_json()
+                st.experimental_rerun()  # 인증 후 페이지를 새로고침하여 인증 완료 상태로 전환
+    
     return creds
-
 def get_google_services(creds):
     """Google Drive 및 Sheets 서비스 생성"""
     gc = gspread.authorize(creds)
