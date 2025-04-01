@@ -5,6 +5,7 @@ import gspread
 from googleapiclient.discovery import build
 import streamlit as st
 from google.oauth2 import service_account
+from google.auth.transport.requests import Request
 
 def split_address(address):
     if pd.isna(address):
@@ -100689,6 +100690,7 @@ def mapping_districts(address):
     
     return address
 
+
 SCOPES = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"]
 
 def authenticate_google():
@@ -100718,7 +100720,12 @@ def authenticate_google():
                 }
                 
                 # 서비스 계정 인증 처리
-                creds = service_account.Credentials.from_service_account_info(service_account_info)
+                creds = service_account.Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
+
+                # 만약 자격증명이 만료된 경우, 자동으로 갱신
+                if creds.expired and creds.refresh_token:
+                    creds.refresh(Request())
+
                 st.session_state.creds = creds  # 인증 정보를 세션 상태에 저장
                 st.success("✅ Google 인증이 완료되었습니다!")
                 return creds

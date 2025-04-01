@@ -59,6 +59,7 @@ def reset_session():
     st.session_state.Negative_file_uploaded = False
     st.session_state.Negative_df = None  # 데이터프레임 초기화 추가
     st.session_state.messages = []
+    st.session_state.creds = None  
 
 # ✅ 사이드바 명령어 안내
 st.sidebar.title("📜 사용 가능 명령어")
