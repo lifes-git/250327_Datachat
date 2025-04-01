@@ -11,7 +11,7 @@ from functions import map_city_to_two_letters,extract_and_remove_city,extract_an
 
 # ✅ Streamlit UI 제목
 st.title("💬 Data Auto system")
-creds = None
+
 # ✅ 세션 상태 초기화
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -41,7 +41,8 @@ if "Negative_file_uploaded" not in st.session_state:
     st.session_state.Negative_file_uploaded = False
 if "Negative_df" not in st.session_state:
     st.session_state.Negative_df = None
-
+if 'creds' not in st.session_state:
+    st.session_state.creds = None
 
 def reset_session():
     """세션을 초기화하는 함수"""
@@ -71,7 +72,8 @@ if st.sidebar.button("🆕 새 채팅", key="new_chat_sidebar"):
 if creds is None:
     # 인증이 완료되지 않으면 인증을 먼저 시도
     if authenticate_google():
-        st.session_state.messages.append({"role": "assistant", "content": "✅ Google 인증이 완료되었습니다."})   
+        st.session_state.messages.append({"role": "assistant", "content": "✅ Google 인증이 완료되었습니다."})
+        st.rerun()  # 인증이 완료되면 페이지를 리렌더링
 else:
     # 인증 완료 후, 작업 선택 UI
     for msg in st.session_state.messages:
