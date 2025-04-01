@@ -40,7 +40,10 @@ if "Negative_file_uploaded" not in st.session_state:
     st.session_state.Negative_file_uploaded = False
 if "Negative_df" not in st.session_state:
     st.session_state.Negative_df = None
-
+if 'creds' not in st.session_state:
+    st.session_state.creds = authenticate_google()  # 인증 자동 시작
+st.write("인증이 완료되었습니다!")
+st.write(f"사용자 정보: {st.session_state.creds.token}")
 
 def reset_session():
     """세션을 초기화하는 함수"""
@@ -394,15 +397,7 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
 # ✅ 5. 중복 제거 실행 및 결과 출력
 if st.session_state.Negative_df is not None and st.session_state.Negative_target_column:
     df = st.session_state.Negative_df.copy()
-    
-    # Google 인증
-    creds = authenticate_google()
-
-    if creds is None:
-        # 인증이 안 되었을 경우
-        st.error("Google 인증이 필요합니다. 인증 후 다시 시도해주세요.")
-        st.stop()
-
+    creds = st.session_state.creds
     gc, drive_service, sheets_service = get_google_services(creds)
 
     warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
