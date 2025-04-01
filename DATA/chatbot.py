@@ -392,10 +392,9 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
             st.session_state.messages.append({"role": "assistant", "content": f"⏳ '{user_target_column}' 열에서 삭제를 진행 중입니다. 잠시만 기다려주세요!"})
             st.rerun()
 
-# ✅ 5. 중복 제거 실행 및 결과 출력
 if st.session_state.Negative_df is not None and st.session_state.Negative_target_column:
     df = st.session_state.Negative_df.copy()
-    
+
     # Google 인증
     creds = authenticate_google()
 
@@ -445,6 +444,9 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
         excel_file = pd.ExcelFile(file_stream)
         sheets = [sheet for sheet in excel_file.sheet_names if sheet not in exclude_sheets]
 
+        # 로딩바 표시: 진행 상황을 0부터 100까지 업데이트
+        progress_bar = st.progress(0)  # 로딩바 초기화
+
         dtype_mapping = {
             '연락처': str,
             '고유값': str,
@@ -465,11 +467,21 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
             '번호변경': str
         }
 
-        outcall_df = pd.concat(
-            [excel_file.parse(sheet, dtype=dtype_mapping) for sheet in sheets],
-            ignore_index=True
-        )
+        # 각 시트를 읽을 때마다 진행 상태 업데이트
+        outcall_df = pd.DataFrame()  # 빈 데이터프레임으로 시작
+        total_sheets = len(sheets)
+        for idx, sheet in enumerate(sheets):
+            sheet_df = excel_file.parse(sheet, dtype=dtype_mapping)
+            outcall_df = pd.concat([outcall_df, sheet_df], ignore_index=True)
+            # 진행 상태 업데이트 (시트마다 진행도 100/전체시트수로 나누기)
+            progress_bar.progress(int(((idx + 1) / total_sheets) * 100))
+            time.sleep(0.5)  # 실제 데이터 로딩 시간에 맞추어 지연을 추가할 수 있습니다
 
+        # 진행 상황이 끝났을 때 (100%)
+        progress_bar.progress(100)
+        time.sleep(0.5)  # 완료 후 잠시 멈춤
+
+        # 이후 데이터 처리
         df = df[~df[st.session_state.Negative_target_column].isin(outcall_df['연락처'])]
 
         # ✅ 결과 메시지 추가
