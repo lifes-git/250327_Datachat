@@ -394,6 +394,13 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
 
 if st.session_state.Negative_df is not None and st.session_state.Negative_target_column:
     df = st.session_state.Negative_df.copy()
+        # Google 인증
+    creds = authenticate_google()
+
+    if creds is None:
+        # 인증이 안 되었을 경우
+        st.error("Google 인증이 필요합니다. 인증 후 다시 시도해주세요.")
+        st.stop()
 #----------------------------------------------------------------------------------------------------------------
     uploaded_files = st.file_uploader("엑셀 파일을 업로드하세요", type=["xls","xlsx"], accept_multiple_files=True)
 
@@ -417,14 +424,6 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
         else:
             st.warning("파일을 제대로 업로드하거나 읽지 못했습니다.")
 #----------------------------------------------------------------------------------------------------------------
-    # Google 인증
-    creds = authenticate_google()
-
-    if creds is None:
-        # 인증이 안 되었을 경우
-        st.error("Google 인증이 필요합니다. 인증 후 다시 시도해주세요.")
-        st.stop()
-
     gc, drive_service, sheets_service = get_google_services(creds)
 
     warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
