@@ -395,27 +395,27 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
 if st.session_state.Negative_df is not None and st.session_state.Negative_target_column:
     df = st.session_state.Negative_df.copy()
 #----------------------------------------------------------------------------------------------------------------
-    uploaded_files = st.file_uploader("엑셀 파일을 업로드하세요", type=["xls"], accept_multiple_files=True)
+    uploaded_files = st.file_uploader("엑셀 파일을 업로드하세요", type=["xls","xlsx"], accept_multiple_files=True)
 
-if uploaded_files:
-    df_list = []  # 데이터프레임을 저장할 리스트
-    
-    # 파일 하나씩 읽어서 처리
-    for uploaded_file in uploaded_files:
-        try:
-            # 업로드된 파일 읽기
-            df = pd.read_csv(uploaded_file, sep="\t", encoding="cp949", skiprows=1, on_bad_lines='skip')
-            df_list.append(df)
-        except Exception as e:
-            st.error(f"파일 '{uploaded_file.name}' 처리 실패 - 오류: {e}")
+    if uploaded_files:
+        df_list = []  # 데이터프레임을 저장할 리스트
+        
+        # 파일 하나씩 읽어서 처리
+        for uploaded_file in uploaded_files:
+            try:
+                # 업로드된 파일 읽기
+                temp_df  = pd.read_csv(uploaded_file, sep="\t", encoding="cp949", skiprows=1, on_bad_lines='skip')
+                df_list.append(temp_df )
+            except Exception as e:
+                st.error(f"파일 '{uploaded_file.name}' 처리 실패 - 오류: {e}")
 
-    # 데이터프레임 하나로 합치기
-    if df_list:
-        call_refusal_080  = pd.concat(df_list, ignore_index=True)
-        call_refusal_080 ['전화번호'] = call_refusal_080 ['전화번호'].str.replace(r'\D', '', regex=True)
-        st.write("최종 데이터프레임:", call_refusal_080 .head())
-    else:
-        st.warning("파일을 제대로 업로드하거나 읽지 못했습니다.")
+        # 데이터프레임 하나로 합치기
+        if df_list:
+            call_refusal_080  = pd.concat(df_list, ignore_index=True)
+            call_refusal_080 ['전화번호'] = call_refusal_080 ['전화번호'].str.replace(r'\D', '', regex=True)
+            st.write("최종 데이터프레임:", call_refusal_080 .head())
+        else:
+            st.warning("파일을 제대로 업로드하거나 읽지 못했습니다.")
 #----------------------------------------------------------------------------------------------------------------
     # Google 인증
     creds = authenticate_google()
