@@ -100723,7 +100723,7 @@ def authenticate_google():
             }
         }
 
-        flow = InstalledAppFlow.from_client_config(client_config, SCOPES)
+        flow = Flow.from_client_config(client_config, SCOPES, redirect_uri=redirect_uri)
 
         # 인증 URL 생성 및 출력
         auth_url, state = flow.authorization_url(prompt="consent")
