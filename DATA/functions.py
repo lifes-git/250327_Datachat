@@ -100698,7 +100698,7 @@ def mapping_districts(address):
 SCOPES = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"]
 
 def authenticate_google():
-    """Streamlit Cloud에서 OAuth 인증을 통해 Google API에 접근"""
+    """버튼을 사용하여 OAuth 인증 개선"""
     if "credentials" not in st.session_state:
         st.session_state["credentials"] = None
 
@@ -100707,73 +100707,100 @@ def authenticate_google():
     if st.session_state["credentials"]:
         try:
             creds = Credentials.from_authorized_user_info(json.loads(st.session_state["credentials"]))
+            if creds and creds.valid:
+                return creds
         except (ValueError, TypeError):
             st.session_state["credentials"] = None
     
-    if not creds or not creds.valid:
-        # 인증되지 않았으면 OAuth 인증 절차 시작
-        client_id = st.secrets["google"]["client_id"]
-        client_secret = st.secrets["google"]["client_secret"]
-        redirect_uri = st.secrets["google"]["redirect_uri"]
-        
-        # OAuth Flow 설정
-        client_config = {
-            "web": {
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "redirect_uris": [redirect_uri],
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token"
-            }
+    # OAuth 설정
+    client_id = st.secrets["google"]["client_id"]
+    client_secret = st.secrets["google"]["client_secret"]
+    redirect_uri = st.secrets["google"]["redirect_uri"]
+    
+    client_config = {
+        "web": {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "redirect_uris": [redirect_uri],
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token"
         }
-
-        # 인증 URL 생성 및 출력
-        if "oauth_flow" not in st.session_state:
-            flow = Flow.from_client_config(
-                client_config, 
-                SCOPES, 
-                redirect_uri=redirect_uri
+    }
+    
+    # 인증 URL 생성
+    if "oauth_flow" not in st.session_state:
+        flow = Flow.from_client_config(
+            client_config, 
+            SCOPES, 
+            redirect_uri=redirect_uri
+        )
+        auth_url, state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            prompt='consent'
+        )
+        st.session_state["oauth_flow"] = flow
+        st.session_state["oauth_state"] = state
+        
+        # 버튼 클릭 시 새 탭에서 인증 페이지 열기
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown(
+                f"""
+                <a href="{auth_url}" target="_blank">
+                    <button style="
+                        background-color: #4285F4;
+                        color: white;
+                        border: none;
+                        border-radius: 4px;
+                        padding: 10px 20px;
+                        font-size: 16px;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        width: 100%;
+                    ">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
+                             style="margin-right: 10px; width: 18px; height: 18px;">
+                        Google 계정으로 로그인
+                    </button>
+                </a>
+                """, 
+                unsafe_allow_html=True
             )
-            auth_url, state = flow.authorization_url(
-                access_type='offline',
-                include_granted_scopes='true',
-                prompt='consent'
-            )
-            st.session_state["oauth_flow"] = flow
-            st.session_state["oauth_state"] = state
-            st.write(f"[Google로 로그인하기]({auth_url})")
-        else:
-            flow = st.session_state["oauth_flow"]
-            st.write("이미 인증 과정이 시작되었습니다. 아래에 콜백 URL을 입력해주세요.")
-
-        # 사용자가 인증 후 리디렉션 URL을 입력하면
-        authorization_response = st.text_input("Enter the full callback URL here")
-
-        if authorization_response:
-            try:
-                # state 검증을 비활성화하고 직접 토큰을 가져옴
-                flow.fetch_token(
-                    authorization_response=authorization_response,
-                    # state 검증을 건너뛰기 위해 명시적으로 None 설정
-                    state=None
-                )
-                creds = flow.credentials
-                # 인증된 credentials을 세션에 저장
-                st.session_state["credentials"] = creds.to_json()
-                # 인증 관련 임시 상태 정보 삭제
+        with col2:
+            if st.button("인증 취소", type="secondary"):
                 if "oauth_flow" in st.session_state:
                     del st.session_state["oauth_flow"]
                 if "oauth_state" in st.session_state:
                     del st.session_state["oauth_state"]
-                st.success("인증에 성공했습니다!")
-                st.experimental_rerun()  # 인증 후 페이지를 새로고침하여 인증 완료 상태로 전환
-            except Exception as e:
-                st.error(f"인증 오류가 발생했습니다: {str(e)}")
-                # 문제 발생 시 인증 과정 초기화
-                if "oauth_flow" in st.session_state:
-                    del st.session_state["oauth_flow"]
-                if "oauth_state" in st.session_state:
-                    del st.session_state["oauth_state"]
+                st.rerun()
+    else:
+        st.info("인증 과정이 시작되었습니다. 구글 로그인 완료 후 받은 URL을 아래에 붙여넣으세요.")
+        flow = st.session_state["oauth_flow"]
+
+    # 콜백 URL 입력 처리
+    st.markdown("---")
+    authorization_response = st.text_input(
+        "인증 후 받은 URL을 여기에 붙여넣으세요", 
+        help="구글 로그인 후 리디렉션된 페이지의 전체 URL을 복사하여 붙여넣으세요"
+    )
+    
+    if authorization_response:
+        try:
+            flow.fetch_token(authorization_response=authorization_response, state=None)
+            creds = flow.credentials
+            st.session_state["credentials"] = creds.to_json()
+            if "oauth_flow" in st.session_state:
+                del st.session_state["oauth_flow"]
+            if "oauth_state" in st.session_state:
+                del st.session_state["oauth_state"]
+            st.success("인증에 성공했습니다!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"인증 오류가 발생했습니다: {str(e)}")
+            # 세부 오류 정보 표시
+            st.expander("상세 오류 정보").write(str(e))
     
     return creds
 
