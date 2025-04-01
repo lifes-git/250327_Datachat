@@ -392,45 +392,49 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
             st.session_state.messages.append({"role": "assistant", "content": f"⏳ '{user_target_column}' 열에서 삭제를 진행 중입니다. 잠시만 기다려주세요!"})
             st.rerun()
 
+# 1. 세션 상태 초기화 및 구글 인증
 if st.session_state.Negative_df is not None and st.session_state.Negative_target_column:
     df = st.session_state.Negative_df.copy()
-        # Google 인증
+    
+    # Google 인증
     creds = authenticate_google()
-
     if creds is None:
-        # 인증이 안 되었을 경우
         st.error("Google 인증이 필요합니다. 인증 후 다시 시도해주세요.")
         st.stop()
-#----------------------------------------------------------------------------------------------------------------
-    uploaded_files = st.file_uploader("엑셀 파일을 업로드하세요", type=["xls","xlsx"], accept_multiple_files=True)
 
-    if uploaded_files:
-        df_list = []  # 데이터프레임을 저장할 리스트
-        
-        # 파일 하나씩 읽어서 처리
-        for uploaded_file in uploaded_files:
-            try:
-                # 업로드된 파일 읽기
-                temp_df  = pd.read_csv(uploaded_file, sep="\t", encoding="cp949", skiprows=1, on_bad_lines='skip')
-                df_list.append(temp_df )
-            except Exception as e:
-                st.error(f"파일 '{uploaded_file.name}' 처리 실패 - 오류: {e}")
+    # Google 인증 완료 후 진행
+    st.session_state.messages.append({"role": "assistant", "content": "✅ Google 인증이 완료되었습니다. 데이터를 처리합니다."})
 
-        # 데이터프레임 하나로 합치기
-        if df_list:
-            call_refusal_080  = pd.concat(df_list, ignore_index=True)
-            call_refusal_080 ['전화번호'] = call_refusal_080 ['전화번호'].str.replace(r'\D', '', regex=True)
-            st.write("최종 데이터프레임:", call_refusal_080 .head())
-        else:
-            st.warning("파일을 제대로 업로드하거나 읽지 못했습니다.")
-#----------------------------------------------------------------------------------------------------------------
+# 2. 엑셀 파일 업로드
+uploaded_files = st.file_uploader("엑셀 파일을 업로드하세요", type=["xls", "xlsx"], accept_multiple_files=True)
+
+if uploaded_files:
+    df_list = []  # 데이터프레임을 저장할 리스트
+
+    for uploaded_file in uploaded_files:
+        try:
+            # 업로드된 파일 읽기
+            temp_df = pd.read_csv(uploaded_file, sep="\t", encoding="cp949", skiprows=1, on_bad_lines='skip')
+            df_list.append(temp_df)
+        except Exception as e:
+            st.error(f"파일 '{uploaded_file.name}' 처리 실패 - 오류: {e}")
+
+    # 데이터프레임 하나로 합치기
+    if df_list:
+        call_refusal_080 = pd.concat(df_list, ignore_index=True)
+        call_refusal_080['전화번호'] = call_refusal_080['전화번호'].str.replace(r'\D', '', regex=True)
+        st.write("최종 데이터프레임:", call_refusal_080.head())
+    else:
+        st.warning("파일을 제대로 업로드하거나 읽지 못했습니다.")
+else:
+    st.warning("엑셀 파일을 업로드 해주세요.")
+
+# 3. Google Drive에서 최신 파일 가져오기
+if creds:
     gc, drive_service, sheets_service = get_google_services(creds)
-
     warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
 
     current_year = datetime.now().year
-
-    # Google Drive에서 최신 엑셀 파일 가져오기
     folder_id = '1NiTuONWRv7jWsqwmAzY0qEJkdls3__AO'
     exclude_sheets = ['드랍', '픽업', '자통당TM 구분']
 
@@ -465,82 +469,56 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
         excel_file = pd.ExcelFile(file_stream)
         sheets = [sheet for sheet in excel_file.sheet_names if sheet not in exclude_sheets]
 
-        # 로딩바 표시: 진행 상황을 0부터 100까지 업데이트
-        progress_bar = st.progress(0)  # 로딩바 초기화
+        # 로딩바 표시
+        progress_bar = st.progress(0)
+        dtype_mapping = { ... }  # 필요한 데이터 타입 정의
 
-        dtype_mapping = {
-            '연락처': str,
-            '고유값': str,
-            '발신 전화번호': str,
-            '픽업코드': str,
-            '드랍코드': str,
-            '결번': str,
-            '부재중': str,
-            '이미 가입': str,
-            '가입 원함': str,
-            '미온': str,
-            '가입 거절': str,
-            '삭제 요청': str,
-            '타인': str,
-            '투표 긍정': str,
-            '다른 당 지지': str,
-            '긍정': str,
-            '번호변경': str
-        }
-
-        # 각 시트를 읽을 때마다 진행 상태 업데이트
         outcall_df = pd.DataFrame()  # 빈 데이터프레임으로 시작
         total_sheets = len(sheets)
         for idx, sheet in enumerate(sheets):
             sheet_df = excel_file.parse(sheet, dtype=dtype_mapping)
             outcall_df = pd.concat([outcall_df, sheet_df], ignore_index=True)
-            # 진행 상태 업데이트 (시트마다 진행도 100/전체시트수로 나누기)
             progress_bar.progress(int(((idx + 1) / total_sheets) * 100))
 
-        # 진행 상황이 끝났을 때 (100%)
         progress_bar.progress(100)
-
         outcall_df = outcall_df[outcall_df['삭제 요청'] == 1]
-#----------------------------------------------------------------------------------------------------------------
-        # 가져올 Google 스프레드시트 파일 ID
-        SPREADSHEET_ID = "1O5IaTXvBQnVTSJhrhPlMI45LxHcL2BkHCHO6IhNA7Bs"
+    st.session_state.messages.append({"role": "assistant", "content": "✅ Google Drive에서 파일을 성공적으로 불러왔습니다."})
 
-        # 1. 스프레드시트 열기
-        sh = gc.open_by_key(SPREADSHEET_ID)
+# 4. Google 스프레드시트 데이터 가져오기
+SPREADSHEET_ID = "1O5IaTXvBQnVTSJhrhPlMI45LxHcL2BkHCHO6IhNA7Bs"
+sh = gc.open_by_key(SPREADSHEET_ID)
+worksheet = sh.get_worksheet(0)  # 첫 번째 시트
 
-        # 2. 특정 시트 데이터 가져오기 (예: 첫 번째 시트)
-        worksheet = sh.get_worksheet(0)  # 0은 첫 번째 시트
+data = worksheet.get_all_values()
+Unsubscribed_df = pd.DataFrame(data[1:], columns=data[0])  # 첫 번째 행을 헤더로 사용
 
-        # 3. 모든 데이터 가져와 pandas DataFrame으로 변환
-        data = worksheet.get_all_values()  # 리스트 형태로 가져오기
-        Unsubscribed_df = pd.DataFrame(data[1:], columns=data[0])  # 첫 번째 행을 헤더로 사용
-#----------------------------------------------------------------------------------------------------------------
+st.session_state.messages.append({"role": "assistant", "content": "✅ 스프레드시트 데이터를 성공적으로 불러왔습니다."})
 
-        # 이후 데이터 처리
-        df = df[~df[st.session_state.Negative_target_column].isin(outcall_df['연락처'])]
-        df = df[~df[st.session_state.Negative_target_column].isin(call_refusal_080['전화번호'])]
-        df = df[~df[st.session_state.Negative_target_column].isin(Unsubscribed_df['phone'])]
+# 5. 데이터 처리
+df = df[~df[st.session_state.Negative_target_column].isin(outcall_df['연락처'])]
+df = df[~df[st.session_state.Negative_target_column].isin(call_refusal_080['전화번호'])]
+df = df[~df[st.session_state.Negative_target_column].isin(Unsubscribed_df['phone'])]
 
-        # ✅ 결과 메시지 추가
-        st.session_state.messages.append({"role": "assistant", "content": "✅ 삭제가 완료되었습니다! 아래에서 결과를 확인하세요."})
-        
-        # ✅ 채팅 형식으로 출력
-        with st.chat_message("assistant"):
-            st.write(df)
+# ✅ 결과 메시지 추가
+st.session_state.messages.append({"role": "assistant", "content": "✅ 삭제가 완료되었습니다! 아래에서 결과를 확인하세요."})
 
-        # ✅ CSV 다운로드 버튼 추가
-        csv_file = io.BytesIO()
-        df.to_csv(csv_file, index=False, encoding='utf-8-sig')
-        csv_file.seek(0)
+# ✅ 채팅 형식으로 출력
+with st.chat_message("assistant"):
+    st.write(df)
 
-        st.download_button(
-            label="📥 중복 확인 결과 다운로드",
-            data=csv_file,
-            file_name="중복_확인_결과.csv",
-            mime="text/csv"
-        )
+# ✅ CSV 다운로드 버튼 추가
+csv_file = io.BytesIO()
+df.to_csv(csv_file, index=False, encoding='utf-8-sig')
+csv_file.seek(0)
 
-        # ✅ 다시 시작 버튼 추가
-        if st.button("🆕 새 채팅", key="new_chat_phone"):
-            reset_session()
-            st.rerun()
+st.download_button(
+    label="📥 중복 확인 결과 다운로드",
+    data=csv_file,
+    file_name="중복_확인_결과.csv",
+    mime="text/csv"
+)
+
+# ✅ 다시 시작 버튼 추가
+if st.button("🆕 새 채팅", key="new_chat_phone"):
+    reset_session()
+    st.rerun()
