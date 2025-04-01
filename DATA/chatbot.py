@@ -421,7 +421,9 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
             call_refusal_080  = pd.concat(df_list, ignore_index=True)
             call_refusal_080 ['전화번호'] = call_refusal_080 ['전화번호'].str.replace(r'\D', '', regex=True)
             st.write("최종 데이터프레임:", call_refusal_080 .head())
-        elif creds is not None:
+        else:
+            st.warning("파일을 제대로 업로드하거나 읽지 못했습니다.")
+        if creds is not None:
             gc, drive_service, sheets_service = get_google_services(creds)
 
             warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
@@ -512,36 +514,33 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
                 # 3. 모든 데이터 가져와 pandas DataFrame으로 변환
                 data = worksheet.get_all_values()  # 리스트 형태로 가져오기
                 Unsubscribed_df = pd.DataFrame(data[1:], columns=data[0])  # 첫 번째 행을 헤더로 사용
-
-        else:
-            st.warning("파일을 제대로 업로드하거나 읽지 못했습니다.")
 #----------------------------------------------------------------------------------------------------------------
 
-        # 이후 데이터 처리
-        df = df[~df[st.session_state.Negative_target_column].isin(outcall_df['연락처'])]
-        df = df[~df[st.session_state.Negative_target_column].isin(call_refusal_080['전화번호'])]
-        df = df[~df[st.session_state.Negative_target_column].isin(Unsubscribed_df['phone'])]
+                # 이후 데이터 처리
+                df = df[~df[st.session_state.Negative_target_column].isin(outcall_df['연락처'])]
+                df = df[~df[st.session_state.Negative_target_column].isin(call_refusal_080['전화번호'])]
+                df = df[~df[st.session_state.Negative_target_column].isin(Unsubscribed_df['phone'])]
 
-        # ✅ 결과 메시지 추가
-        st.session_state.messages.append({"role": "assistant", "content": "✅ 삭제가 완료되었습니다! 아래에서 결과를 확인하세요."})
-        
-        # ✅ 채팅 형식으로 출력
-        with st.chat_message("assistant"):
-            st.write(df)
+                # ✅ 결과 메시지 추가
+                st.session_state.messages.append({"role": "assistant", "content": "✅ 삭제가 완료되었습니다! 아래에서 결과를 확인하세요."})
+                
+                # ✅ 채팅 형식으로 출력
+                with st.chat_message("assistant"):
+                    st.write(df)
 
-        # ✅ CSV 다운로드 버튼 추가
-        csv_file = io.BytesIO()
-        df.to_csv(csv_file, index=False, encoding='utf-8-sig')
-        csv_file.seek(0)
+                # ✅ CSV 다운로드 버튼 추가
+                csv_file = io.BytesIO()
+                df.to_csv(csv_file, index=False, encoding='utf-8-sig')
+                csv_file.seek(0)
 
-        st.download_button(
-            label="📥 중복 확인 결과 다운로드",
-            data=csv_file,
-            file_name="중복_확인_결과.csv",
-            mime="text/csv"
-        )
+                st.download_button(
+                    label="📥 중복 확인 결과 다운로드",
+                    data=csv_file,
+                    file_name="중복_확인_결과.csv",
+                    mime="text/csv"
+                )
 
-        # ✅ 다시 시작 버튼 추가
-        if st.button("🆕 새 채팅", key="new_chat_phone"):
-            reset_session()
-            st.rerun()
+                # ✅ 다시 시작 버튼 추가
+                if st.button("🆕 새 채팅", key="new_chat_phone"):
+                    reset_session()
+                    st.rerun()
