@@ -100725,7 +100725,7 @@ def authenticate_google():
                 }
                 
                 # 서비스 계정 인증 처리
-                creds = Credentials.from_service_account_info(service_account_info)
+                creds = service_account.Credentials.from_service_account_info(service_account_info)
                 st.session_state.creds = creds  # 인증 정보를 세션 상태에 저장
                 st.success("✅ Google 인증이 완료되었습니다!")
                 return creds
