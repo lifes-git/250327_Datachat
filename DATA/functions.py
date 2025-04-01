@@ -100704,7 +100704,7 @@ def authenticate_google():
         # 사용자 입력을 받음 (보안 강화를 위해)
         st.subheader("🔑 Google 서비스 계정 인증")
         client_email = st.text_input("📧 서비스 계정 이메일", type="default")
-        private_key = st.text_area("🔑 비공개 키 (PRIVATE KEY)", type="password")
+        private_key = st.text_input("🔑 비공개 키 (PRIVATE KEY)", type="password")
 
         # 사용자가 입력한 값이 있는지 확인
         if client_email and private_key:
