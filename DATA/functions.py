@@ -100723,7 +100723,7 @@ def authenticate_google():
             }
         }
 
-        flow = Flow.from_client_config(client_config, SCOPES, redirect_uri=redirect_uri)
+        flow =  Flow.from_client_config(client_config, SCOPES, redirect_uri=redirect_uri)
 
         # 인증 URL 생성 및 출력
         auth_url, state = flow.authorization_url(prompt="consent")
@@ -100742,6 +100742,15 @@ def authenticate_google():
                 creds = flow.credentials
                 # 인증된 credentials을 세션에 저장
                 st.session_state["credentials"] = creds.to_json()
+                
+                # 인증이 완료되면 사용자에게 인증 완료 메시지 및 리디렉션 URL 출력
+                st.success("인증이 완료되었습니다!")
+                
+                # 사용자에게 복사할 수 있는 리디렉션 URL 출력
+                st.subheader("리디렉션 URL을 복사하세요:")
+                redirect_url = f"{redirect_uri}?code={creds.token}"
+                st.text_area("리디렉션 URL", value=redirect_url, height=100)
+                
                 st.experimental_rerun()  # 인증 후 페이지를 새로고침하여 인증 완료 상태로 전환
     
     return creds
