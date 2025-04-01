@@ -12,6 +12,7 @@ from googleapiclient.discovery import build
 import pickle
 import streamlit as st
 import json
+from google.oauth2 import service_account
 def split_address(address):
     if pd.isna(address):
         return "", address
@@ -100709,10 +100710,11 @@ def authenticate_google():
         # 사용자가 입력한 값이 있는지 확인
         if client_email and private_key:
             try:
+                private_key_id = st.secrets["google"]["private_key_id"]
                 service_account_info = {
                     "type": "service_account",
-                    "project_id": "your_project_id",  # 공개 가능
-                    "private_key_id": "your_private_key_id",  # 민감도가 낮아도 노출 주의
+                    "project_id": "sonic-provider-443108-h7",  # 공개 가능
+                    "private_key_id": private_key_id,  # 민감도가 낮아도 노출 주의
                     "private_key": private_key.replace("\\n", "\n"),  # 입력된 키를 정상 포맷으로 변환
                     "client_email": client_email,
                     "client_id": "your_client_id",
