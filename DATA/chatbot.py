@@ -77,7 +77,7 @@ for msg in st.session_state.messages:
 if st.session_state.task is None:
     id = st.text_input("🔑 ID를 입력하세요")
     password = st.text_input("🔑 비밀번호를 입력하세요", type="password")
-    if id == st.secrets['google']['id'] and password == ['google']['password']:
+    if id == st.secrets['google']['id'] and password == st.secrets['google']['password']:
         st.session_state.messages.append({"role": "assistant", "content": "🔑 인증 성공! 아래에서 작업을 선택하세요."})
         selected_task = st.selectbox("💬 수행할 작업을 선택하세요:", ["", "중복 확인", "주소 정제","강성데이터삭제"])
 
