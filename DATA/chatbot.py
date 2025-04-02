@@ -75,20 +75,26 @@ for msg in st.session_state.messages:
 
 # ✅ 1. 작업 선택을 UI에서 클릭하여 선택
 if st.session_state.task is None:
-    selected_task = st.selectbox("💬 수행할 작업을 선택하세요:", ["", "중복 확인", "주소 정제","강성데이터삭제"])
+    id = st.text_input("🔑 ID를 입력하세요")
+    password = st.text_input("🔑 비밀번호를 입력하세요", type="password")
+    if id == st.secrets['google']['id'] and password == ['google']['password']:
+        st.session_state.messages.append({"role": "assistant", "content": "🔑 인증 성공! 아래에서 작업을 선택하세요."})
+        selected_task = st.selectbox("💬 수행할 작업을 선택하세요:", ["", "중복 확인", "주소 정제","강성데이터삭제"])
 
-    if selected_task:
-        st.session_state.task = selected_task
-        st.session_state.messages.append({"role": "user", "content": f"📌 선택한 작업: {selected_task}"})
+        if selected_task:
+            st.session_state.task = selected_task
+            st.session_state.messages.append({"role": "user", "content": f"📌 선택한 작업: {selected_task}"})
 
-        if selected_task == "중복 확인":
-            st.session_state.messages.append({"role": "assistant", "content": "🔤 문자열로 읽을 열을 입력해주세요. (예: '이름' 또는 '주소')"})
-        elif selected_task == "주소 정제":
-            st.session_state.messages.append({"role": "assistant", "content": "📍 주소 정제를 진행할 열을 입력해주세요!"})
-        elif selected_task == "강성데이터삭제":
-            st.session_state.messages.append({"role": "assistant", "content": "📍 삭제를 진행할 열을 입력해주세요!"})
-        st.rerun()  # 선택 즉시 리렌더링
-
+            if selected_task == "중복 확인":
+                st.session_state.messages.append({"role": "assistant", "content": "🔤 문자열로 읽을 열을 입력해주세요. (예: '이름' 또는 '주소')"})
+            elif selected_task == "주소 정제":
+                st.session_state.messages.append({"role": "assistant", "content": "📍 주소 정제를 진행할 열을 입력해주세요!"})
+            elif selected_task == "강성데이터삭제":
+                st.session_state.messages.append({"role": "assistant", "content": "📍 삭제를 진행할 열을 입력해주세요!"})
+            st.rerun()  # 선택 즉시 리렌더링
+    else:
+        st.session_state.messages.append({"role": "assistant", "content": "❌ 인증 실패! 다시 시도해주세요."})
+        st.stop()
 #-------------------------------------------------------중복확인------------------------------------------------------------------------------------------------
 # ✅ 2. phone 문자열로 읽을 열 선택
 if st.session_state.task == "중복 확인" and st.session_state.phone_string_column is None:
@@ -344,7 +350,7 @@ if st.session_state.address_df is not None and st.session_state.address_target_c
         reset_session()
         st.rerun()
 
-#----------------------------------------------------------080 ,자유마을,아웃콜 삭제요청---------------------------------------------------------------------------------------------# ✅ 문자로 읽을 열이름 선택
+#----------------------------------------------------------강성DB삭제---------------------------------------------------------------------------------------------
 # ✅ 문자로 읽을 열이름 선택
 if st.session_state.task == "강성데이터삭제" and st.session_state.Negative_string_column is None:
     user_column = st.text_input("🔤 문자열로 읽을 열을 입력하세요...")
@@ -370,7 +376,7 @@ if st.session_state.Negative_string_column and not st.session_state.Negative_fil
         
         st.rerun()  # 🔄 리렌더링
 
-# ✅ 4. Negative 업로드된 파일 확인
+# ✅ 4. Negative 업로드된  파일 확인
 if st.session_state.Negative_df is not None:
     with st.chat_message("assistant"):
         st.write("📊 업로드된 데이터 미리보기:")
@@ -421,7 +427,7 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
         if df_list:
             call_refusal_080  = pd.concat(df_list, ignore_index=True)
             call_refusal_080 ['전화번호'] = call_refusal_080 ['전화번호'].str.replace(r'\D', '', regex=True)
-            st.write("최종 데이터프레임:", call_refusal_080 .head())
+            st.write("080수신거부:", call_refusal_080 .head())
         else:
             st.warning("파일을 제대로 업로드하거나 읽지 못했습니다.")
         if creds is not None:
@@ -502,6 +508,7 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
                 progress_bar.progress(100)
 
                 outcall_df = outcall_df[outcall_df['삭제 요청'] == 1]
+                st.write("아웃콜삭제요청:", outcall_df .head())
 #----------------------------------------------------------------------------------------------------------------
                 # 가져올 Google 스프레드시트 파일 ID
                 SPREADSHEET_ID = "1O5IaTXvBQnVTSJhrhPlMI45LxHcL2BkHCHO6IhNA7Bs"
@@ -515,6 +522,7 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
                 # 3. 모든 데이터 가져와 pandas DataFrame으로 변환
                 data = worksheet.get_all_values()  # 리스트 형태로 가져오기
                 Unsubscribed_df = pd.DataFrame(data[1:], columns=data[0])  # 첫 번째 행을 헤더로 사용
+                st.write("탈퇴자:", Unsubscribed_df .head())
 #----------------------------------------------------------------------------------------------------------------
 
                 # 이후 데이터 처리
