@@ -67,7 +67,7 @@ def reset_session():
     st.session_state.creds = None  
 
 # ✅ 사이드바 명령어 안내
-st.sidebar.title("📜 사용 가능 명령어")
+st.sidebar.title("🧠 New Chat")
 if st.sidebar.button("🔄 대화 초기화", key="new_chat_sidebar",use_container_width=True, type="primary"):
     reset_session()
     st.success("✅ 대화가 초기화되었습니다.")
@@ -81,8 +81,8 @@ for msg in st.session_state.messages:
 
 # ✅ 1. 작업 선택을 UI에서 클릭하여 선택
 if st.session_state.task is None:
-    id = st.text_input("🔑 ID를 입력하세요")
-    password = st.text_input("🔑 비밀번호를 입력하세요", type="password")
+    id = st.text_input("👤 ID를 입력하세요")
+    password = st.text_input("🔓 비밀번호를 입력하세요", type="password")
     if id == st.secrets['google']['id'] and password == st.secrets['google']['password']:
         st.session_state.messages.append({"role": "assistant", "content": "🔑 인증 성공! 아래에서 작업을 선택하세요."})
         selected_task = st.selectbox("💬 수행할 작업을 선택하세요:", ["", "중복 확인", "주소 정제","강성데이터삭제"])
