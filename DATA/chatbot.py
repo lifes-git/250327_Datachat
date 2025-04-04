@@ -46,6 +46,8 @@ if "Negative_file_uploaded" not in st.session_state:
     st.session_state.Negative_file_uploaded = False
 if "Negative_df" not in st.session_state:
     st.session_state.Negative_df = None
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False  # 인증 상태 초기화
 
 
 def reset_session():
@@ -79,8 +81,7 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-# ✅ 1. 작업 선택을 UI에서 클릭하여 선택
-if st.session_state.task is None:
+if not st.session_state.authenticated:
     with st.form("login_form"):
         id = st.text_input("👤 ID를 입력하세요")
         password = st.text_input("🔓 비밀번호를 입력하세요", type="password")
@@ -88,23 +89,29 @@ if st.session_state.task is None:
 
     if submitted:
         if id == st.secrets['google']['id'] and password == st.secrets['google']['password']:
+            st.session_state.authenticated = True  # 인증 성공
             st.session_state.messages.append({"role": "assistant", "content": "🔑 인증 성공! 아래에서 작업을 선택하세요."})
-            selected_task = st.selectbox("💬 수행할 작업을 선택하세요:", ["", "중복 확인", "주소 정제", "강성데이터삭제"])
-
-            if selected_task:
-                st.session_state.task = selected_task
-                st.session_state.messages.append({"role": "user", "content": f"📌 선택한 작업: {selected_task}"})
-
-                if selected_task == "중복 확인":
-                    st.session_state.messages.append({"role": "assistant", "content": "🔤 문자열로 읽을 열을 입력해주세요. (예: '이름' 또는 '주소')"})
-                elif selected_task == "주소 정제":
-                    st.session_state.messages.append({"role": "assistant", "content": "📍 주소 정제를 진행할 열을 입력해주세요!"})
-                elif selected_task == "강성데이터삭제":
-                    st.session_state.messages.append({"role": "assistant", "content": "📍 삭제를 진행할 열을 입력해주세요!"})
-                st.rerun()  # 선택 즉시 리렌더링
+            st.rerun()  # UI 리렌더링
         else:
             st.session_state.messages.append({"role": "assistant", "content": "❌ 인증 실패! 다시 시도해주세요."})
             st.stop()
+
+# ✅ 인증된 경우에만 작업 선택 UI 표시
+if st.session_state.authenticated:
+    selected_task = st.selectbox("💬 수행할 작업을 선택하세요:", ["", "중복 확인", "주소 정제", "강성데이터삭제"])
+
+    if selected_task:
+        st.session_state.task = selected_task
+        st.session_state.messages.append({"role": "user", "content": f"📌 선택한 작업: {selected_task}"})
+
+        if selected_task == "중복 확인":
+            st.session_state.messages.append({"role": "assistant", "content": "🔤 문자열로 읽을 열을 입력해주세요. (예: '이름' 또는 '주소')"})
+        elif selected_task == "주소 정제":
+            st.session_state.messages.append({"role": "assistant", "content": "📍 주소 정제를 진행할 열을 입력해주세요!"})
+        elif selected_task == "강성데이터삭제":
+            st.session_state.messages.append({"role": "assistant", "content": "📍 삭제를 진행할 열을 입력해주세요!"})
+
+        st.rerun()  # 선택 즉시 리렌더링
 #-------------------------------------------------------중복확인------------------------------------------------------------------------------------------------
 # ✅ 2. phone 문자열로 읽을 열 선택
 if st.session_state.task == "중복 확인" and st.session_state.phone_string_column is None:
