@@ -100,7 +100,7 @@ if not st.session_state.authenticated:
 if st.session_state.authenticated:
     selected_task = st.selectbox("💬 수행할 작업을 선택하세요:", ["", "중복 확인", "주소 정제", "강성데이터삭제"])
 
-    if selected_task:
+    if selected_task and st.button("✅ 작업 선택"):
         st.session_state.task = selected_task
         st.session_state.messages.append({"role": "user", "content": f"📌 선택한 작업: {selected_task}"})
 
@@ -111,7 +111,7 @@ if st.session_state.authenticated:
         elif selected_task == "강성데이터삭제":
             st.session_state.messages.append({"role": "assistant", "content": "📍 삭제를 진행할 열을 입력해주세요!"})
 
-        st.rerun()  # 선택 즉시 리렌더링
+        st.rerun()
 #-------------------------------------------------------중복확인------------------------------------------------------------------------------------------------
 # ✅ 2. phone 문자열로 읽을 열 선택
 if st.session_state.task == "중복 확인" and st.session_state.phone_string_column is None:
