@@ -9,8 +9,13 @@ from google.oauth2 import service_account
 import time
 from functions import map_city_to_two_letters,extract_and_remove_city,extract_and_remove_district,split_address, df_id, df_hang, mapping_city, mapping_districts, get_google_services,authenticate_google
 
+st.set_page_config(page_title="Data_Team", page_icon="🧠", layout="wide")
+st.sidebar.markdown("### ✍️ Made by [KMD]('노션추가') 🚀")
+st.sidebar.divider()  # 구분선 추가
+
 # ✅ Streamlit UI 제목
 st.title("💬 Data Auto system")
+st.markdown("✨ 업무효율을 위한 자동화 시스템")
 
 # ✅ 세션 상태 초기화
 if "messages" not in st.session_state:
@@ -63,8 +68,9 @@ def reset_session():
 
 # ✅ 사이드바 명령어 안내
 st.sidebar.title("📜 사용 가능 명령어")
-if st.sidebar.button("🆕 새 채팅", key="new_chat_sidebar"):
+if st.sidebar.button("🔄 대화 초기화", key="new_chat_sidebar",use_container_width=True, type="primary"):
     reset_session()
+    st.success("✅ 대화가 초기화되었습니다.")
     st.rerun()
 
 
@@ -172,6 +178,7 @@ if st.session_state.phone_df is not None and st.session_state.phone_target_colum
     # ✅ 다시 시작 버튼 추가
     if st.button("🆕 새 채팅", key="new_chat_phone"):
         reset_session()
+        st.success("✅ 대화가 초기화되었습니다.")
         st.rerun()
 
 #----------------------------------------------------------주소정제---------------------------------------------------------------------------------------------
@@ -348,6 +355,7 @@ if st.session_state.address_df is not None and st.session_state.address_target_c
     # ✅ 다시 시작 버튼 추가
     if st.button("🆕 새 채팅", key="new_chat_phone"):
         reset_session()
+        st.success("✅ 대화가 초기화되었습니다.")
         st.rerun()
 
 #----------------------------------------------------------강성DB삭제---------------------------------------------------------------------------------------------
@@ -438,7 +446,7 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
             current_year = datetime.now().year
 
             # Google Drive에서 최신 엑셀 파일 가져오기
-            folder_id = '1NiTuONWRv7jWsqwmAzY0qEJkdls3__AO'
+            folder_id = st.secrets['google']['outcall_folder_id']
             exclude_sheets = ['드랍', '픽업', '자통당TM 구분']
 
             response = drive_service.files().list(
@@ -511,7 +519,7 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
                 st.write("아웃콜삭제요청:", outcall_df .head())
 #----------------------------------------------------------------------------------------------------------------
                 # 가져올 Google 스프레드시트 파일 ID
-                SPREADSHEET_ID = "1O5IaTXvBQnVTSJhrhPlMI45LxHcL2BkHCHO6IhNA7Bs"
+                SPREADSHEET_ID = st.secrets['google']['Unsubscribed_SPREADSHEET_ID ']
 
                 # 1. 스프레드시트 열기
                 sh = gc.open_by_key(SPREADSHEET_ID)
@@ -552,4 +560,5 @@ if st.session_state.Negative_df is not None and st.session_state.Negative_target
                 # ✅ 다시 시작 버튼 추가
                 if st.button("🆕 새 채팅", key="new_chat_phone"):
                     reset_session()
+                    st.success("✅ 대화가 초기화되었습니다.")
                     st.rerun()
